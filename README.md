@@ -64,6 +64,8 @@ npm run package:win
 
 The Windows CI also starts the published core as the runner's ordinary user and verifies settings, overview, collector-health, pause/resume, and SQLite IPC responses. The smoke test never requests elevation or performs a destructive process/service/startup action.
 
+After packaging, CI launches the complete `win-unpacked` Electron application and verifies that the React application shell mounts, the bundled C# Core starts, real process/service data arrives over IPC, ten collector capability states are present, and the packaged desktop version matches the release metadata. The test then terminates only its own TraceGuard process tree.
+
 ## Roadmap
 
 - **Phase 1 (complete):** executable desktop shell, i18n, process/service/startup visibility, basic file monitoring, live terminal, floating widget/bubble, SQLite persistence.

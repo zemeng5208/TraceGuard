@@ -210,6 +210,39 @@ function applyWindowSettings() {
   }
 }
 
+async function writeDesktopSmokeStatus() {
+  const target = process.env.TRACEGUARD_SMOKE_FILE;
+  if (!target) return;
+  const write = (value) => {
+    fs.mkdirSync(path.dirname(target), { recursive: true });
+    fs.writeFileSync(target, JSON.stringify(value, null, 2), 'utf8');
+  };
+  try {
+    const window = createWindow('main');
+    if (window.webContents.isLoadingMainFrame()) {
+      await new Promise((resolve, reject) => {
+        const timeout = setTimeout(() => reject(new Error('Renderer load timed out.')), 30_000);
+        window.webContents.once('did-finish-load', () => { clearTimeout(timeout); resolve(); });
+        window.webContents.once('did-fail-load', (_event, code, description) => { clearTimeout(timeout); reject(new Error(`Renderer failed to load (${code}): ${description}`)); });
+      });
+    }
+    const rendererReady = await window.webContents.executeJavaScript("Boolean(document.querySelector('.app-shell'))", true);
+    const overview = await core.request('getOverview');
+    write({
+      success: Boolean(rendererReady && overview.processCount > 0 && overview.serviceCount > 0),
+      packaged: app.isPackaged,
+      version: app.getVersion(),
+      rendererReady: Boolean(rendererReady),
+      coreReady: true,
+      processCount: overview.processCount,
+      serviceCount: overview.serviceCount,
+      monitorModules: overview.monitorModules?.length ?? 0,
+    });
+  } catch (error) {
+    write({ success: false, packaged: app.isPackaged, version: app.getVersion(), error: error instanceof Error ? error.message : String(error) });
+  }
+}
+
 app.whenReady().then(() => {
   loadWindowState();
   nativeTheme.themeSource = 'dark';
@@ -225,7 +258,7 @@ app.whenReady().then(() => {
       notification.show();
     }
   });
-  void core.request('getSettings').then((settings) => {
+  void core.request('getSettings').then(async (settings) => {
     runtimeSettings = { ...runtimeSettings, ...settings };
     refreshTrayMenu();
     app.setLoginItemSettings({ openAtLogin: Boolean(settings.launchAtSignIn), args: settings.startMinimized ? ['--start-minimized'] : [] });
@@ -233,6 +266,7 @@ app.whenReady().then(() => {
     else if (settings.floatingWidgetEnabled && settings.startSurface === 'widget') createWindow('widget');
     else if (settings.startSurface === 'bubble') createWindow('bubble');
     applyWindowSettings();
+    await writeDesktopSmokeStatus();
   }).catch(() => { createWindow('main'); createWindow('widget'); });
   globalShortcut.register('CommandOrControl+Shift+T', () => {
     const widget = windows.get('widget');
