@@ -20,6 +20,7 @@
 - [x] Windows CI validates .NET tests, C# publish, and renderer build
 - [x] Windows package validation with separate per-user installer and portable artifact names
 - [x] Runtime language switching for native tray, bubble menu, tooltip, and notifications
+- [x] Published-core IPC smoke test running as the ordinary Windows CI user
 
 ## Phase 2 — complete
 
@@ -59,4 +60,4 @@
 
 ## Next checkpoint
 
-Validate native-menu localization and packaging documentation in CI, then continue with zero-privilege USN/ETW capability evaluation and Windows runtime smoke testing.
+Validate the published-core IPC smoke test in Windows CI, then continue with zero-privilege USN/ETW capability evaluation and full desktop runtime testing.

@@ -24,6 +24,9 @@ jobs:
       - run: npm ci
       - run: dotnet test TraceGuard.sln --configuration Release
       - run: dotnet publish src/TraceGuard.Core/TraceGuard.Core.csproj --configuration Release --runtime win-x64 --self-contained true
+      - name: Smoke-test zero-privilege core IPC
+        shell: pwsh
+        run: ./scripts/smoke-core.ps1 -Executable ./src/TraceGuard.Core/bin/Release/net8.0-windows10.0.19041.0/win-x64/publish/TraceGuard.Core.exe
       - run: npm run build
       - run: npm run package:win
       - uses: actions/upload-artifact@v4

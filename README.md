@@ -62,6 +62,8 @@ npm run build
 npm run package:win
 ```
 
+The Windows CI also starts the published core as the runner's ordinary user and verifies settings, overview, collector-health, pause/resume, and SQLite IPC responses. The smoke test never requests elevation or performs a destructive process/service/startup action.
+
 ## Roadmap
 
 - **Phase 1 (complete):** executable desktop shell, i18n, process/service/startup visibility, basic file monitoring, live terminal, floating widget/bubble, SQLite persistence.
