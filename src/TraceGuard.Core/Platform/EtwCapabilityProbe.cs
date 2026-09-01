@@ -24,15 +24,21 @@ public static class EtwCapabilityProbe
     private static MonitorModuleStatus Probe()
     {
         if (!OperatingSystem.IsWindows()) return Evaluate(false, false);
+        return Evaluate(true, CanControlUserSessions());
+    }
+
+    public static bool CanControlUserSessions()
+    {
+        if (!OperatingSystem.IsWindows()) return false;
         try
         {
             using var identity = WindowsIdentity.GetCurrent(TokenAccessLevels.Query);
             var principal = new WindowsPrincipal(identity);
             var performanceLogUsers = new SecurityIdentifier(PerformanceLogUsersSid);
-            return Evaluate(true, principal.IsInRole(performanceLogUsers));
+            return principal.IsInRole(performanceLogUsers);
         }
-        catch (UnauthorizedAccessException) { return Evaluate(true, false); }
-        catch (SystemException) { return Evaluate(true, false); }
+        catch (UnauthorizedAccessException) { return false; }
+        catch (SystemException) { return false; }
     }
 
     internal static MonitorModuleStatus Evaluate(bool isWindows, bool isPerformanceLogUser)
@@ -41,8 +47,8 @@ public static class EtwCapabilityProbe
             return new("etw", "unavailable", "ETW is available only on Windows.", "ETW 仅适用于 Windows。");
         if (isPerformanceLogUser)
             return new("etw", "available",
-                "The current token belongs to Performance Log Users. User-mode ETW session control is eligible, but provider attribution is not enabled yet.",
-                "当前令牌属于“性能日志用户”组，具备用户模式 ETW 会话控制资格，但尚未启用提供程序事件归属。");
+                "The current token belongs to Performance Log Users. Supported user-mode ETW attribution can start when file or process monitoring is enabled.",
+                "当前令牌属于“性能日志用户”组。开启文件或进程监控后可启动受支持的用户模式 ETW 归属。");
         return new("etw", "unavailable",
             "The current token cannot control general ETW sessions. TraceGuard will not request elevation or change group membership.",
             "当前令牌无法控制常规 ETW 会话。TraceGuard 不会请求提权或修改用户组成员身份。");

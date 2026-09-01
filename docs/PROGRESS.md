@@ -63,10 +63,10 @@
 - [x] Incrementally read new USN v2 records on eligible volumes, resolve paths by file ID where accessible, and fall back per-volume without elevation
 - [ ] Correlate USN changes with the exact originating process (currently reported as best-effort installer-session attribution)
 - [x] Evaluate current-token eligibility for user-session ETW control without requiring elevation
-- [ ] Enable and consume explicitly supported user-mode ETW providers only when the current token is eligible
+- [x] Enable only the process/file manifest providers for eligible current tokens and correlate exact-path metadata events with PID/process identity
 - [ ] Complete Windows 10/11 hardware compatibility testing (automated Windows runner coverage is complete)
 - [ ] Normalize release version and publish the first verified package
 
 ## Next checkpoint
 
-Validate the zero-privilege USN reader and final Portable wrapper in Windows CI, then continue with ETW provider consumption and first-release preparation.
+Validate optional ETW attribution and its safe unavailable path in Windows CI, then complete first-release preparation and the documented Windows 10/11 compatibility matrix.

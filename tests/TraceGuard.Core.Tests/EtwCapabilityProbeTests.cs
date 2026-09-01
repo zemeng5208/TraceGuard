@@ -6,12 +6,12 @@ namespace TraceGuard.Core.Tests;
 public sealed class EtwCapabilityProbeTests
 {
     [Fact]
-    public void PerformanceLogUserIsReportedAsEligibleWithoutClaimingAttribution()
+    public void PerformanceLogUserIsReportedAsEligibleWithoutClaimingActiveSession()
     {
         var status = EtwCapabilityProbe.Evaluate(true, true);
 
         Assert.Equal("available", status.State);
-        Assert.Contains("not enabled yet", status.Message);
+        Assert.Contains("can start", status.Message);
     }
 
     [Fact]

@@ -16,6 +16,7 @@ public sealed class CoreHost : IDisposable
     private readonly InstallationSessionTracker _sessions;
     private readonly RuleEngine _rules;
     private readonly ConfigurationMonitor _configurations;
+    private readonly EtwAttributionMonitor _etw = new();
     private readonly SystemSampler _sampler = new();
     private readonly object _monitoringGate = new();
     private Timer? _powerTimer;
@@ -134,6 +135,7 @@ public sealed class CoreHost : IDisposable
             StopCollectors();
             if (!_monitoringRequested) return;
             _batteryLimited = _settings.PauseOnBattery && PowerStatus.IsOnBattery();
+            _etw.Start(_settings.FileMonitoring, _settings.ProcessMonitoring);
             if (_settings.FileMonitoring) _files.Start(_settings.FullDiskMonitoring && !_batteryLimited);
             if (_settings.ProcessMonitoring) _processes.Start();
             if (HasConfigurationMonitoring(_settings)) _configurations.Start(_settings);
@@ -176,6 +178,11 @@ public sealed class CoreHost : IDisposable
                     $"Incrementally reading {_files.UsnVolumeCount} existing NTFS journal(s) with the current user token.",
                     $"正在使用当前用户令牌增量读取 {_files.UsnVolumeCount} 个现有 NTFS 日志。")
                 : UsnJournalProbe.GetStatus();
+            var etw = _etw.IsRunning
+                ? new MonitorModuleStatus("etw", "active",
+                    "Supported process and file providers are supplying current-token event attribution.",
+                    "受支持的进程与文件提供程序正在提供当前令牌范围内的事件归属。")
+                : EtwCapabilityProbe.GetStatus();
             return
             [
                 file,
@@ -187,7 +194,7 @@ public sealed class CoreHost : IDisposable
                 Status("network", _settings.NetworkMonitoring, configurationRunning, "Network configuration monitoring is active.", "网络配置监控正在运行。"),
                 Status("update", _settings.UpdateMonitoring, configurationRunning, "Windows Update observation is active.", "Windows Update 活动观察正在运行。"),
                 usn,
-                EtwCapabilityProbe.GetStatus()
+                etw
             ];
         }
     }
@@ -197,11 +204,13 @@ public sealed class CoreHost : IDisposable
         _files.Stop();
         _processes.Stop();
         _configurations.Stop();
+        _etw.Stop();
         _monitoring = false;
     }
 
     private void QueueEvent(TraceEvent item, Action<TraceEvent> publish)
     {
+        item = _etw.Attribute(item);
         _sessions.OnEvent(item);
         _ = Task.Run(async () =>
         {
@@ -237,5 +246,6 @@ public sealed class CoreHost : IDisposable
         _files.Dispose();
         _processes.Dispose();
         _configurations.Dispose();
+        _etw.Dispose();
     }
 }
