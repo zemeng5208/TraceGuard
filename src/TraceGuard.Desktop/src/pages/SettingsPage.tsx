@@ -5,7 +5,7 @@ import {
 } from 'lucide-react';
 import { useDeferredValue, useEffect, useMemo, useState, type CSSProperties, type ReactNode } from 'react';
 import { isChinese, secondaryText, text } from '@/i18n';
-import type { AppSettings, EventCategory, StorageInfo } from '@/types';
+import type { AppSettings, EventCategory, MonitorModuleStatus, Overview, StorageInfo } from '@/types';
 import { defaultSettings } from '@/data/preview';
 import { traceGuardApi } from '@/bridge';
 
@@ -97,7 +97,7 @@ function Appearance({ settings, onChange }: SettingsContentProps) {
   </>;
 }
 
-interface SettingsContentProps { settings: AppSettings; onChange: (patch: Partial<AppSettings>) => void }
+interface SettingsContentProps { settings: AppSettings; onChange: (patch: Partial<AppSettings>) => void; overview?: Overview | null }
 
 function StorageContent({ settings, onChange }: SettingsContentProps) {
   const isZh = zh(settings);
@@ -120,7 +120,7 @@ function StorageContent({ settings, onChange }: SettingsContentProps) {
 
 const formatBytes = (value: number) => value >= 1024*1024 ? `${(value/1024/1024).toFixed(1)} MB` : `${Math.round(value/1024)} KB`;
 
-function StandardContent({ section, settings, onChange }: SettingsContentProps & { section: SectionId }) {
+function StandardContent({ section, settings, onChange, overview }: SettingsContentProps & { section: SectionId }) {
   const isZh = zh(settings);
   const title = text(sections.find((item) => item.id === section)?.key ?? section, settings.locale);
   const Icon = sections.find((item) => item.id === section)?.icon ?? Settings2;
@@ -134,6 +134,18 @@ function StandardContent({ section, settings, onChange }: SettingsContentProps &
     [isZh ? 'Windows Update 活动' : 'Windows Update Activity', isZh ? '观察可读取的更新活动，不强制停止系统组件。' : 'Observes readable update activity and never force-stops system components.', 'updateMonitoring'],
     [isZh ? '网络设置变化' : 'Network Change Monitoring', isZh ? '观察代理、DNS 与 Hosts 元数据等可读取配置。' : 'Observes readable proxy, DNS, and Hosts metadata.', 'networkMonitoring'],
   ];
+  const moduleBySetting: Partial<Record<keyof AppSettings, MonitorModuleStatus['id']>> = {
+    fileMonitoring: 'file', processMonitoring: 'process', serviceMonitoring: 'service', startupMonitoring: 'startup',
+    registryMonitoring: 'registry', browserMonitoring: 'browser', updateMonitoring: 'update', networkMonitoring: 'network',
+  };
+  const statusFor = (id?: MonitorModuleStatus['id']) => overview?.monitorModules.find((item) => item.id === id);
+  const statusLabel = (status?: MonitorModuleStatus) => {
+    if (!status) return isZh ? '正在读取' : 'Checking';
+    const labels = isZh
+      ? { active: '运行中', reduced: '已降频', paused: '已暂停', disabled: '已关闭', unavailable: '不可用' }
+      : { active: 'Active', reduced: 'Reduced', paused: 'Paused', disabled: 'Disabled', unavailable: 'Unavailable' };
+    return labels[status.state];
+  };
   let body: ReactNode;
   if (section === 'general') body = <SettingCard title={isZh ? '应用行为' : 'Application behavior'}>
     <SettingRow title={isZh ? '登录 Windows 后启动 TraceGuard' : 'Launch at Windows Sign-in'} description={isZh ? '仅使用当前用户登录启动，不请求管理员权限。' : 'Uses current-user sign-in launch only; no elevation.'}><Toggle checked={settings.launchAtSignIn} onChange={(launchAtSignIn) => onChange({ launchAtSignIn })} /></SettingRow>
@@ -145,7 +157,7 @@ function StandardContent({ section, settings, onChange }: SettingsContentProps &
     <SettingRow title={isZh ? '恢复上次页面' : 'Restore Last Page'} description={isZh ? '重新打开时回到最近使用的一级页面。' : 'Return to the most recently used primary page.'}><Toggle checked={settings.restoreLastPage} onChange={(restoreLastPage) => onChange({ restoreLastPage })} /></SettingRow>
   </SettingCard>;
   else if (section === 'language') body = <SettingCard title={isZh ? '界面语言' : 'Interface language'} subtitle={isZh ? '切换后立即应用，原始 Windows 字段保持不翻译。' : 'Applies immediately; raw Windows fields remain unchanged.'}><Choices value={settings.locale} options={[{ value: 'auto', label: text('automatic', settings.locale) }, { value: 'en-US', label: 'English' }, { value: 'zh-CN', label: '简体中文' }]} onChange={(locale) => onChange({ locale })} /></SettingCard>;
-  else if (section === 'monitoring') body = <><SettingCard title={isZh ? '监控模块' : 'Monitoring modules'}>{monitorRows.map(([label, description, key]) => <SettingRow key={key} title={label} description={description}><Toggle checked={Boolean(settings[key])} onChange={(value) => onChange({ [key]: value })} /></SettingRow>)}</SettingCard><SettingCard title={isZh ? '监控范围' : 'Monitoring scope'}><SettingRow title={isZh ? '完整磁盘监控' : 'Full Disk Monitoring'} description={isZh ? '监控所有可访问本地磁盘，可能增加少量 CPU 与磁盘使用。' : 'Monitors accessible local drives and may slightly increase CPU and disk use.'}><Toggle checked={settings.fullDiskMonitoring} onChange={(fullDiskMonitoring) => onChange({ fullDiskMonitoring })} /></SettingRow></SettingCard></>;
+  else if (section === 'monitoring') body = <><div className={`monitoring-banner state-${overview?.monitoringMode ?? 'paused'}`}><span>●</span><div><strong>{overview?.monitoringMode === 'paused' ? (isZh ? '采集已暂停' : 'Collection paused') : overview?.monitoringMode === 'reduced' ? (isZh ? '低功耗采集模式' : 'Reduced collection mode') : (isZh ? '采集核心正在运行' : 'Collection core is running')}</strong><small>{overview?.onBattery ? (isZh ? '当前使用电池供电' : 'Currently on battery power') : (isZh ? '当前使用外接电源' : 'Currently on AC power')}</small></div></div><SettingCard title={isZh ? '监控模块' : 'Monitoring modules'}>{monitorRows.map(([label, description, key]) => { const status = statusFor(moduleBySetting[key]); return <SettingRow key={key} title={label} description={status ? (isZh ? status.messageZh : status.message) : description}><div className="monitor-control"><span className={`module-status status-${status?.state ?? 'checking'}`}>{statusLabel(status)}</span><Toggle checked={Boolean(settings[key])} onChange={(value) => onChange({ [key]: value })} /></div></SettingRow>; })}</SettingCard><SettingCard title={isZh ? '监控范围' : 'Monitoring scope'}><SettingRow title={isZh ? '完整磁盘监控' : 'Full Disk Monitoring'} description={isZh ? '监控所有可访问本地磁盘；电池供电时自动缩减为用户目录。' : 'Monitors accessible local drives; automatically reduces to user folders on battery.'}><Toggle checked={settings.fullDiskMonitoring} onChange={(fullDiskMonitoring) => onChange({ fullDiskMonitoring })} /></SettingRow></SettingCard></>;
   else if (section === 'floatingWindow') body = <SettingCard title={isZh ? '悬浮信息面板' : 'Floating widget'}>
     <SettingRow title={isZh ? '启用悬浮窗' : 'Floating Widget Enabled'} description={isZh ? '显示实时活动摘要。' : 'Shows a compact live activity summary.'}><Toggle checked={settings.floatingWidgetEnabled} onChange={(floatingWidgetEnabled) => onChange({ floatingWidgetEnabled })} /></SettingRow>
     <SettingRow title={isZh ? '始终置顶' : 'Always on Top'} description={isZh ? '让悬浮窗保持在其它窗口上方。' : 'Keeps the widget above other windows.'}><Toggle checked={settings.alwaysOnTop} onChange={(alwaysOnTop) => onChange({ alwaysOnTop })} /></SettingRow>
@@ -198,12 +210,12 @@ function StandardContent({ section, settings, onChange }: SettingsContentProps &
   else if (section === 'privacy') body = <><div className="privacy-banner"><ShieldCheck size={22} /><div><strong>{isZh ? '本机处理 · 无遥测' : 'Local processing · No telemetry'}</strong><span>{isZh ? 'TraceGuard 不会发送遥测，也不会读取文件正文、密码、Cookie 或浏览历史正文。' : 'TraceGuard sends no telemetry and never reads file contents, passwords, cookies, or browsing-history content.'}</span></div></div><SettingCard title={isZh ? '数据最小化' : 'Data minimization'}><SettingRow title={isZh ? '保存文件路径' : 'Store File Paths'} description={isZh ? '关闭后仅保存匿名摘要；事件解释会减少。' : 'When off, stores anonymized summaries and reduces event detail.'}><Toggle checked={settings.storeFilePaths} onChange={(storeFilePaths) => onChange({ storeFilePaths })} /></SettingRow></SettingCard></>;
   else if (section === 'storage') body = <StorageContent settings={settings} onChange={onChange}/>;
   else if (section === 'protection') body = <><div className="coreguard-banner"><ShieldCheck size={25} /><div><strong>CoreGuard</strong><span>{isZh ? '防止 TraceGuard 对关键 Windows 核心组件执行危险操作。此保护不可关闭。' : 'Protects critical Windows components from destructive TraceGuard actions. It cannot be disabled.'}</span></div><span className="locked-pill">{isZh ? '始终开启' : 'Always on'}</span></div><SettingCard title={isZh ? '操作确认' : 'Action confirmations'}><SettingRow title={isZh ? '停止进程前警告' : 'Warn Before Stopping Process'} description={isZh ? '对允许控制的普通进程显示确认。' : 'Confirms actions on controllable standard processes.'}><Toggle checked={settings.warnBeforeStopping} onChange={(warnBeforeStopping) => onChange({ warnBeforeStopping })} /></SettingRow><SettingRow title={isZh?'禁用启动项前警告':'Warn Before Disabling Startup'} description={isZh?'修改当前用户启动入口前确认。':'Confirms before changing a current-user startup entry.'}><Toggle checked={settings.warnBeforeDisablingStartup} onChange={(warnBeforeDisablingStartup)=>onChange({warnBeforeDisablingStartup})}/></SettingRow><SettingRow title={isZh ? '恢复操作确认' : 'Confirm Restore Operations'} description={isZh ? '在修改用户级配置前请求确认。' : 'Confirms before changing user-level configuration.'}><Toggle checked={settings.confirmRestore} onChange={(confirmRestore) => onChange({ confirmRestore })} /></SettingRow><SettingRow title={isZh?'创建规则前确认':'Confirm Rule Creation'} description={isZh?'创建自动阻止规则前显示确认。':'Confirms before creating an automatic blocking rule.'}><Toggle checked={settings.confirmRuleCreation} onChange={(confirmRuleCreation)=>onChange({confirmRuleCreation})}/></SettingRow></SettingCard></>;
-  else if (section === 'advanced') body = <><div className="advanced-warning"><Bot size={21} /><span>{isZh ? '高级设置可能影响 TraceGuard 的行为，建议普通用户保持默认值。' : 'Advanced settings can change TraceGuard behavior. Default values are recommended.'}</span></div><SettingCard title={isZh ? '采集能力状态' : 'Collection capability status'}><SettingRow title="FileSystemWatcher" description={isZh?'已启用元数据变化监控；不读取文件正文。':'Active metadata change monitoring; file contents are never read.'}><span className="local-pill">{isZh?'已启用':'Active'}</span></SettingRow><SettingRow title="USN Journal / ETW" description={isZh?'零提权模式会在权限不足时安全降级，不提供虚假开关。':'Zero-Privilege Mode degrades safely when access is unavailable; no fake control is exposed.'}><span className="locked-pill">{isZh?'安全降级':'Safe fallback'}</span></SettingRow></SettingCard></>;
-  else body = <SettingCard title="TraceGuard 1.0.0"><div className="about-mark"><span className="brand-shield">TG</span><div><strong>See what changed.</strong><span>Understand why. Control what you own.</span><small>Windows 10 / 11 · Zero-Privilege · Local First</small></div></div></SettingCard>;
+  else if (section === 'advanced') { const fileStatus = statusFor('file'); body = <><div className="advanced-warning"><Bot size={21} /><span>{isZh ? '高级设置可能影响 TraceGuard 的行为，建议普通用户保持默认值。' : 'Advanced settings can change TraceGuard behavior. Default values are recommended.'}</span></div><SettingCard title={isZh ? '采集能力状态' : 'Collection capability status'}><SettingRow title="FileSystemWatcher" description={fileStatus ? (isZh ? fileStatus.messageZh : fileStatus.message) : (isZh ? '正在读取真实运行状态。' : 'Reading actual runtime status.')}><span className={`module-status status-${fileStatus?.state ?? 'checking'}`}>{statusLabel(fileStatus)}</span></SettingRow><SettingRow title="USN Journal" description={isZh?'此版本尚未启用；当前使用 FileSystemWatcher，不显示虚假开关。':'Not enabled in this build; FileSystemWatcher is used and no fake switch is shown.'}><span className="module-status status-unavailable">{isZh?'尚未实现':'Not implemented'}</span></SettingRow><SettingRow title="ETW Attribution" description={isZh?'此版本尚未启用；安装报告会明确标注时间窗口归属限制。':'Not enabled in this build; reports disclose time-window attribution limits.'}><span className="module-status status-unavailable">{isZh?'尚未实现':'Not implemented'}</span></SettingRow></SettingCard></>; }
+  else body = <SettingCard title="TraceGuard 0.2.0"><div className="about-mark"><span className="brand-shield">TG</span><div><strong>See what changed.</strong><span>Understand why. Control what you own.</span><small>Windows 10 / 11 · Zero-Privilege · Local First</small></div></div></SettingCard>;
   return <><div className="settings-heading"><span className="heading-orb"><Icon size={19} /></span><div><h2>{title}</h2><small>{secondaryText(sections.find((item) => item.id === section)?.key ?? section, settings.locale)}</small></div></div><div className="settings-stack">{body}</div></>;
 }
 
-export function SettingsPage({ settings, onChange }: SettingsContentProps) {
+export function SettingsPage({ settings, onChange, overview }: SettingsContentProps) {
   const [section, setSection] = useState<SectionId>('appearance');
   const [query, setQuery] = useState('');
   const deferred = useDeferredValue(query.trim().toLowerCase());
@@ -220,7 +232,7 @@ export function SettingsPage({ settings, onChange }: SettingsContentProps) {
       <div className="settings-safe"><ShieldCheck size={16} /><span><strong>Zero-Privilege</strong><small>{zh(settings) ? '所有设置均不请求提权' : 'Settings never request elevation'}</small></span></div>
     </aside>
     <div className="settings-content">
-      {section === 'appearance' ? <Appearance settings={settings} onChange={onChange} /> : <StandardContent section={section} settings={settings} onChange={onChange} />}
+      {section === 'appearance' ? <Appearance settings={settings} onChange={onChange} /> : <StandardContent section={section} settings={settings} overview={overview} onChange={onChange} />}
       <footer className="settings-reset">
         <button type="button" disabled={sectionDefaults[section].length === 0} onClick={restoreSection}>{isChinese(settings.locale) ? '恢复此分类默认值' : 'Restore category defaults'}</button>
         <button type="button" onClick={() => { if (window.confirm(isChinese(settings.locale) ? '重置全部设置？事件历史、规则和报告不会被删除。' : 'Reset all settings? Event history, rules, and reports will not be deleted.')) onChange(defaultSettings); }}>{isChinese(settings.locale) ? '重置全部设置' : 'Reset all settings'}</button>

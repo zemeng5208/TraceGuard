@@ -17,9 +17,9 @@
 - [x] CoreGuard process/service denylist and tests
 - [x] Windows CI build and packaged artifact
 - [ ] Visual browser QA and final fidelity pass (browser runtime unavailable in the current cloud environment)
-- [ ] Windows CI validation for the Phase 2 checkpoint
+- [ ] Windows CI validation for the latest runtime-health checkpoint
 
-## Phase 2 — active
+## Phase 2 — complete
 
 - [x] Installer process detection and persistent sessions
 - [x] Parent/child/grandchild process capture with launch-source inference
@@ -29,10 +29,31 @@
 - [x] SQLite-backed Rules center
 - [x] Block Auto-Restart with CoreGuard and current-token permission checks
 - [x] Explicit best-effort attribution disclosure
-- [ ] Session completion grace period for long-lived installer descendants
-- [ ] Restore disabled startup entries from the Restore Center
-- [ ] Broader launch-source correlation with enumerated startup entries and scheduled tasks
+- [x] Session completion grace period for long-lived installer descendants
+- [x] Restore disabled startup entries from the Restore Center
+- [x] Broader launch-source correlation with enumerated startup entries and scheduled tasks
+
+## Phase 3 — complete
+
+- [x] Chrome, Edge, and Firefox readable configuration baselines
+- [x] Default-application and file-association observation
+- [x] Proxy, DNS, Hosts, and readable network-configuration observation
+- [x] Windows Update service, worker-process, and event observation
+- [x] Live configuration differences with bilingual explanations
+- [x] Real readable-process CPU and I/O sampling
+- [x] Exportable installer behavior reports with risk explanations
+
+## Phase 4 / release hardening — active
+
+- [x] Runtime collector health states: active, reduced, paused, disabled, unavailable
+- [x] Dynamic battery-mode reduction without stopping core process observation
+- [x] Real one-minute event rates and event-derived Dashboard chart
+- [x] Remove hard-coded disk/network percentages and sample telemetry from production UI
+- [ ] Evaluate zero-privilege USN Journal availability and implement a safe fallback boundary
+- [ ] Evaluate user-session ETW providers without requiring elevation
+- [ ] Complete Windows 10/11 build, installer, and runtime smoke tests
+- [ ] Normalize release version and publish the first verified package
 
 ## Next checkpoint
 
-Complete the remaining Phase 2 restoration and attribution work, then begin Phase 3 with read-only browser configuration baselines and Windows Update activity observation.
+Run the runtime-health checkpoint in Windows CI, then continue with zero-privilege USN/ETW capability evaluation and release packaging.

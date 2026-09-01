@@ -17,8 +17,12 @@ public sealed class CoreHost : IDisposable
     private readonly RuleEngine _rules;
     private readonly ConfigurationMonitor _configurations;
     private readonly SystemSampler _sampler = new();
+    private readonly object _monitoringGate = new();
+    private Timer? _powerTimer;
     private AppSettings _settings = new();
     private bool _monitoring;
+    private bool _monitoringRequested = true;
+    private bool _batteryLimited;
 
     public CoreHost(AppPaths paths, Action<TraceEvent> publish)
     {
@@ -39,14 +43,22 @@ public sealed class CoreHost : IDisposable
         await _rules.InitializeAsync();
         await _events.ApplyRetentionAsync(_settings.RetentionDays);
         StartMonitoring();
+        _powerTimer = new Timer(_ => RefreshPowerMode(), null, TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(5));
     }
 
     public async Task<Overview> GetOverviewAsync()
     {
         var sample = _sampler.Sample();
+        var since = DateTimeOffset.UtcNow.AddMinutes(-1);
+        var fileChanges = _events.CountCategoryAsync("file");
+        var registryChanges = _events.CountCategoryAsync("registry");
+        var fileRate = _events.CountCategorySinceAsync("file", since);
+        var registryRate = _events.CountCategorySinceAsync("registry", since);
         return new Overview(
-            await _events.CountCategoryAsync("file"),
-            await _events.CountCategoryAsync("registry"),
+            await fileChanges,
+            await registryChanges,
+            await fileRate,
+            await registryRate,
             CountProcesses(),
             CountServices(),
             sample.IoBytesPerSecond,
@@ -54,6 +66,9 @@ public sealed class CoreHost : IDisposable
             sample.Cpu,
             sample.Memory,
             _monitoring,
+            !_monitoringRequested ? "paused" : _batteryLimited || _settings.LowPowerMode ? "reduced" : "active",
+            PowerStatus.IsOnBattery(),
+            GetMonitorModules(),
             _sessions.Current is { } session ? new ActiveInstaller(session.RootProcess, session.RootPid, Math.Max(0, (int)(DateTimeOffset.UtcNow - session.StartedAt).TotalSeconds), session.ChangeCount) : null);
     }
 
@@ -79,19 +94,21 @@ public sealed class CoreHost : IDisposable
     {
         _settings = await _settingsStore.SaveAsync(settings);
         _sessions.RegistryMonitoringEnabled = _settings.RegistryMonitoring;
-        if (_monitoring) StartMonitoring();
+        if (_monitoringRequested) ApplyMonitoringConfiguration();
         await _events.ApplyRetentionAsync(_settings.RetentionDays);
         return _settings;
     }
 
     public ActionResult PauseMonitoring()
     {
-        StopMonitoring();
+        _monitoringRequested = false;
+        StopCollectors();
         return new(true, "Monitoring paused.", "监控已暂停。");
     }
 
     public ActionResult ResumeMonitoring()
     {
+        _monitoringRequested = true;
         StartMonitoring();
         return new(true, "Monitoring resumed.", "监控已恢复。");
     }
@@ -106,15 +123,65 @@ public sealed class CoreHost : IDisposable
 
     private void StartMonitoring()
     {
-        StopMonitoring();
-        var batteryLimited = _settings.PauseOnBattery && PowerStatus.IsOnBattery();
-        if (_settings.FileMonitoring) _files.Start(_settings.FullDiskMonitoring && !batteryLimited);
-        if (_settings.ProcessMonitoring) _processes.Start();
-        _configurations.Start(_settings);
-        _monitoring = true;
+        _monitoringRequested = true;
+        ApplyMonitoringConfiguration();
     }
 
-    private void StopMonitoring()
+    private void ApplyMonitoringConfiguration()
+    {
+        lock (_monitoringGate)
+        {
+            StopCollectors();
+            if (!_monitoringRequested) return;
+            _batteryLimited = _settings.PauseOnBattery && PowerStatus.IsOnBattery();
+            if (_settings.FileMonitoring) _files.Start(_settings.FullDiskMonitoring && !_batteryLimited);
+            if (_settings.ProcessMonitoring) _processes.Start();
+            if (HasConfigurationMonitoring(_settings)) _configurations.Start(_settings);
+            _monitoring = _files.WatcherCount > 0 || _processes.IsRunning || _configurations.IsRunning;
+        }
+    }
+
+    private void RefreshPowerMode()
+    {
+        if (!_monitoringRequested || !_settings.PauseOnBattery) return;
+        var limited = PowerStatus.IsOnBattery();
+        if (limited != _batteryLimited) ApplyMonitoringConfiguration();
+    }
+
+    private static bool HasConfigurationMonitoring(AppSettings settings) =>
+        settings.RegistryMonitoring || settings.ServiceMonitoring || settings.StartupMonitoring || settings.BrowserMonitoring || settings.NetworkMonitoring || settings.UpdateMonitoring;
+
+    private IReadOnlyList<MonitorModuleStatus> GetMonitorModules()
+    {
+        lock (_monitoringGate)
+        {
+            MonitorModuleStatus Status(string id, bool enabled, bool running, string active, string activeZh)
+            {
+                if (!enabled) return new(id, "disabled", "Disabled in Settings.", "已在设置中关闭。");
+                if (!_monitoringRequested) return new(id, "paused", "Paused by the user. Collection is stopped.", "已由用户暂停，采集已停止。");
+                return running ? new(id, "active", active, activeZh) : new(id, "unavailable", "No accessible source is available to the current user.", "当前用户没有可访问的数据源。");
+            }
+
+            var configurationRunning = _configurations.IsRunning;
+            var file = Status("file", _settings.FileMonitoring, _files.WatcherCount > 0,
+                _batteryLimited && _settings.FullDiskMonitoring ? "User folders active; full-disk scope is reduced on battery." : $"Watching {_files.WatcherCount} accessible location(s).",
+                _batteryLimited && _settings.FullDiskMonitoring ? "用户目录监控正常；电池供电时已缩减全磁盘范围。" : $"正在监控 {_files.WatcherCount} 个可访问位置。");
+            if (file.State == "active" && _batteryLimited && _settings.FullDiskMonitoring) file = file with { State = "reduced" };
+            return
+            [
+                file,
+                Status("process", _settings.ProcessMonitoring, _processes.IsRunning, "Polling process starts and exits.", "正在观察进程启动与退出。"),
+                Status("registry", _settings.RegistryMonitoring, configurationRunning, $"Current-user configuration diff every {_configurations.PollIntervalMs / 1000}s.", $"每 {_configurations.PollIntervalMs / 1000} 秒比较当前用户配置。"),
+                Status("service", _settings.ServiceMonitoring, configurationRunning, $"Read-only service comparison every {_configurations.PollIntervalMs / 1000}s.", $"每 {_configurations.PollIntervalMs / 1000} 秒只读比较服务状态。"),
+                Status("startup", _settings.StartupMonitoring, configurationRunning, $"User startup comparison every {_configurations.PollIntervalMs / 1000}s.", $"每 {_configurations.PollIntervalMs / 1000} 秒比较用户启动项。"),
+                Status("browser", _settings.BrowserMonitoring, configurationRunning, "Browser configuration monitoring is active.", "浏览器配置监控正在运行。"),
+                Status("network", _settings.NetworkMonitoring, configurationRunning, "Network configuration monitoring is active.", "网络配置监控正在运行。"),
+                Status("update", _settings.UpdateMonitoring, configurationRunning, "Windows Update observation is active.", "Windows Update 活动观察正在运行。")
+            ];
+        }
+    }
+
+    private void StopCollectors()
     {
         _files.Stop();
         _processes.Stop();
@@ -152,7 +219,10 @@ public sealed class CoreHost : IDisposable
 
     public void Dispose()
     {
-        StopMonitoring();
+        _powerTimer?.Dispose();
+        _powerTimer = null;
+        _monitoringRequested = false;
+        StopCollectors();
         _files.Dispose();
         _processes.Dispose();
         _configurations.Dispose();

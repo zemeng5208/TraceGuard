@@ -5,6 +5,7 @@ namespace TraceGuard.Core.Monitoring;
 public sealed class FileMonitor(Action<TraceEvent> publish) : IDisposable
 {
     private readonly List<FileSystemWatcher> _watchers = [];
+    public int WatcherCount => _watchers.Count;
 
     public void Start(bool fullDisk)
     {

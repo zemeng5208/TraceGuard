@@ -10,9 +10,12 @@ public sealed record RpcEvent(string Event, object Data);
 public sealed record ActionResult(bool Success, string? Message = null, string? MessageZh = null, bool RequiresElevation = false);
 
 public sealed record ActiveInstaller(string Name, int Pid, int ElapsedSeconds, int ChangeCount);
+public sealed record MonitorModuleStatus(string Id, string State, string Message, string MessageZh);
 public sealed record Overview(
     long FileChanges,
     long RegistryChanges,
+    long FileChangesPerMinute,
+    long RegistryChangesPerMinute,
     int ProcessCount,
     int ServiceCount,
     long DiskBytesPerSecond,
@@ -20,6 +23,9 @@ public sealed record Overview(
     double CpuPercent,
     double MemoryPercent,
     bool Monitoring,
+    string MonitoringMode,
+    bool OnBattery,
+    IReadOnlyList<MonitorModuleStatus> MonitorModules,
     ActiveInstaller? ActiveInstaller = null);
 
 public sealed record TraceEvent(

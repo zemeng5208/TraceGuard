@@ -15,14 +15,16 @@ public sealed class ConfigurationMonitor(Action<TraceEvent> publish) : IDisposab
     private AppSettings _settings = new();
     private Timer? _timer;
     private int _polling;
+    public bool IsRunning => _timer is not null;
+    public int PollIntervalMs { get; private set; }
 
     public void Start(AppSettings settings)
     {
         Stop();
         _settings = settings;
         CaptureBaselines();
-        var interval = settings.LowPowerMode || settings.PauseOnBattery && PowerStatus.IsOnBattery() ? 10_000 : 4_000;
-        _timer = new Timer(_ => Poll(), null, interval, interval);
+        PollIntervalMs = settings.LowPowerMode || settings.PauseOnBattery && PowerStatus.IsOnBattery() ? 10_000 : 4_000;
+        _timer = new Timer(_ => Poll(), null, PollIntervalMs, PollIntervalMs);
     }
 
     private void CaptureBaselines()
@@ -119,6 +121,7 @@ public sealed class ConfigurationMonitor(Action<TraceEvent> publish) : IDisposab
     {
         _timer?.Dispose();
         _timer = null;
+        PollIntervalMs = 0;
         _registryBaseline.Clear();
         _browserBaseline.Clear();
         _networkBaseline.Clear();

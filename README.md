@@ -7,7 +7,7 @@ TraceGuard is a local-first Windows 10/11 desktop application that explains soft
 
 ## Current status
 
-Phase 1 MVP is complete and Phase 2 is in active development. The current build contains the Electron + React desktop shell, bilingual premium-glass UI, structured live terminal, floating surfaces, a working .NET 8 observation core, CoreGuard, local persistence, installer behavior sessions, process launch chains, registry before/after diffs, user-level startup control, and current-user Block Auto-Restart rules.
+Phase 1 and the planned Phase 2/3 observation flows are implemented. The current build contains the Electron + React desktop shell, bilingual premium-glass UI, structured live terminal, floating surfaces, a working .NET 8 observation core, CoreGuard, local persistence, installer behavior sessions, process launch chains, registry before/after diffs, user-level startup control, current-user Block Auto-Restart rules, browser/network/default-app baselines, Windows Update activity, exportable behavior reports, and truthful runtime collector health.
 
 ## Safety model
 
@@ -65,14 +65,14 @@ npm run package:win
 ## Roadmap
 
 - **Phase 1 (complete):** executable desktop shell, i18n, process/service/startup visibility, basic file monitoring, live terminal, floating widget/bubble, SQLite persistence.
-- **Phase 2 (active):** installer sessions, process trees, registry diffing, user-startup control, auto-restart blocking, launch-source analysis.
-- **Phase 3:** browser/network/default-app/Windows Update observation.
-- **Phase 4:** USN Journal, ETW attribution, behavior reports, risk explanations, restore center.
+- **Phase 2 (complete):** installer sessions, process trees, registry diffing, user-startup control and restore, auto-restart blocking, launch-source analysis.
+- **Phase 3 (complete):** browser/network/default-app/Windows Update observation and live configuration differences.
+- **Phase 4 (active):** collector hardening, richer attribution, safe USN/ETW capability work, release testing and packaging.
 
 ## Known limitations
 
 TraceGuard does not request administrator permission. Some system services, protected processes, and machine-level configuration can therefore be observed but cannot be controlled. This is expected behavior under the Windows security model.
 
-File monitoring currently uses Windows `FileSystemWatcher` and records metadata within the current user's accessible scope. Phase 2 installer reports associate those events with an installer session by time window; this is explicitly labeled as best-effort and is not presented as exact process attribution. The NTFS USN Journal and ETW attribution are planned for Phase 4. Disk throughput is intentionally reported as unavailable in production until a reliable zero-privilege sampler is implemented; the UI does not invent a value.
+File monitoring currently uses Windows `FileSystemWatcher` and records metadata within the current user's accessible scope. Installer reports associate those events with an installer session by time window; this is explicitly labeled as best-effort and is not presented as exact process attribution. The NTFS USN Journal and ETW attribution are not enabled in this build and no fake settings are exposed for them. Disk activity aggregates I/O counters from processes readable by the current user, so elevated or protected-process activity can remain unaccounted for. The UI labels this boundary instead of inventing a value.
 
 See [architecture](docs/ARCHITECTURE.md), [security model](docs/SECURITY.md), and [development progress](docs/PROGRESS.md).

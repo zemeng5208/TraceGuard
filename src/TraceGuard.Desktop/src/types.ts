@@ -27,6 +27,8 @@ export interface TraceEvent {
 export interface Overview {
   fileChanges: number;
   registryChanges: number;
+  fileChangesPerMinute: number;
+  registryChangesPerMinute: number;
   processCount: number;
   serviceCount: number;
   diskBytesPerSecond: number;
@@ -34,12 +36,22 @@ export interface Overview {
   cpuPercent: number;
   memoryPercent: number;
   monitoring: boolean;
+  monitoringMode: 'active' | 'reduced' | 'paused';
+  onBattery: boolean;
+  monitorModules: MonitorModuleStatus[];
   activeInstaller?: {
     name: string;
     pid: number;
     elapsedSeconds: number;
     changeCount: number;
   };
+}
+
+export interface MonitorModuleStatus {
+  id: 'file' | 'process' | 'registry' | 'service' | 'startup' | 'browser' | 'network' | 'update';
+  state: 'active' | 'reduced' | 'paused' | 'disabled' | 'unavailable';
+  message: string;
+  messageZh: string;
 }
 
 export interface ProcessRow {

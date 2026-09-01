@@ -35,16 +35,26 @@ export function MetricCard({
   );
 }
 
-const chartSeries = {
-  file: [45, 58, 53, 62, 55, 48, 68, 61, 52, 76, 50, 61, 54, 90, 65, 71, 43, 63, 54, 81, 60],
-  registry: [26, 38, 32, 44, 29, 35, 41, 25, 31, 47, 28, 34, 27, 52, 33, 39, 24, 36, 30, 43, 29],
-  process: [11, 18, 14, 22, 13, 17, 26, 12, 19, 28, 13, 18, 15, 39, 19, 24, 12, 21, 16, 25, 14],
-};
-
 const linePoints = (series: number[], max = 100) =>
   series.map((value, index) => `${32 + index * (520 / (series.length - 1))},${144 - (value / max) * 110}`).join(' ');
 
-export function ActivityChart({ settings }: { settings: AppSettings }) {
+const eventSeries = (events: TraceEvent[], now = Date.now()) => {
+  const buckets = { file: Array(21).fill(0) as number[], registry: Array(21).fill(0) as number[], process: Array(21).fill(0) as number[] };
+  for (const event of events) {
+    if (!(event.category in buckets)) continue;
+    const age = now - new Date(event.timestamp).getTime();
+    if (age < 0 || age > 60_000) continue;
+    const index = Math.min(20, Math.floor((60_000 - age) / 3_000));
+    buckets[event.category as keyof typeof buckets][index] += 1;
+  }
+  return buckets;
+};
+
+export function ActivityChart({ events, settings }: { events: TraceEvent[]; settings: AppSettings }) {
+  const series = eventSeries(events);
+  const max = Math.max(1, ...series.file, ...series.registry, ...series.process);
+  const now = Date.now();
+  const timeLabels = Array.from({ length: 7 }, (_, index) => new Date(now - (6 - index) * 10_000).toLocaleTimeString([], { hour12: false, minute: '2-digit', second: '2-digit' }));
   return (
     <section className="panel activity-panel">
       <header className="panel-title-row">
@@ -53,11 +63,11 @@ export function ActivityChart({ settings }: { settings: AppSettings }) {
       </header>
       <svg viewBox="0 0 590 170" className="activity-chart" role="img" aria-label="Live event volume">
         {[34, 70, 107, 144].map((y, index) => <line key={y} x1="32" y1={y} x2="560" y2={y} className="chart-grid" />)}
-        {[120, 90, 60, 30].map((label, index) => <text key={label} x="5" y={39 + index * 37}>{label}</text>)}
-        <polyline points={linePoints(chartSeries.file)} className="chart-line chart-line--file" />
-        <polyline points={linePoints(chartSeries.registry)} className="chart-line chart-line--registry" />
-        <polyline points={linePoints(chartSeries.process)} className="chart-line chart-line--process" />
-        {['10:32:00', '10:32:10', '10:32:20', '10:32:30', '10:32:40', '10:32:50', '10:33:00'].map((label, index) => (
+        {[max, Math.round(max * .67), Math.round(max * .33), 0].map((label, index) => <text key={`${label}-${index}`} x="5" y={39 + index * 37}>{label}</text>)}
+        <polyline points={linePoints(series.file, max)} className="chart-line chart-line--file" />
+        <polyline points={linePoints(series.registry, max)} className="chart-line chart-line--registry" />
+        <polyline points={linePoints(series.process, max)} className="chart-line chart-line--process" />
+        {timeLabels.map((label, index) => (
           <text key={label} x={32 + index * 87} y="165" textAnchor={index === 6 ? 'end' : index === 0 ? 'start' : 'middle'}>{label}</text>
         ))}
       </svg>
@@ -112,14 +122,15 @@ export function ResourceGauge({ value, label, color }: { value: number; label: s
 }
 
 export function ResourcePanel({ overview, settings }: { overview: Overview | null; settings: AppSettings }) {
+  const formatRate = (value = 0) => value >= 1024 * 1024 ? `${(value / 1024 / 1024).toFixed(1)} MB/s` : value >= 1024 ? `${(value / 1024).toFixed(0)} KB/s` : `${value} B/s`;
   return (
     <section className="panel resource-panel">
       <header className="panel-title-row"><div><h2>{text('systemResources', settings.locale)}</h2><span>{secondaryText('systemResources', settings.locale)}</span></div></header>
-      <div className="gauge-grid">
+      <div className="gauge-grid gauge-grid--truthful">
         <ResourceGauge value={overview?.cpuPercent ?? 0} label="CPU" color="#4f9cff" />
         <ResourceGauge value={overview?.memoryPercent ?? 0} label={isChinese(settings.locale) ? '内存' : 'RAM'} color="#62d797" />
-        <ResourceGauge value={32} label={isChinese(settings.locale) ? '磁盘' : 'Disk'} color="#4f9cff" />
-        <ResourceGauge value={18} label={isChinese(settings.locale) ? '网络' : 'Network'} color="#62d797" />
+        <div className="resource-rate"><small>{isChinese(settings.locale) ? '磁盘 I/O' : 'Disk I/O'}</small><strong>{formatRate(overview?.diskBytesPerSecond)}</strong><span>{isChinese(settings.locale) ? '可读进程' : 'Readable processes'}</span></div>
+        <div className="resource-rate"><small>{isChinese(settings.locale) ? '网络' : 'Network'}</small><strong>{formatRate(overview?.networkBytesPerSecond)}</strong><span>{isChinese(settings.locale) ? '网卡总量' : 'Interface total'}</span></div>
       </div>
       <div className="resource-note"><ShieldAlert size={15} /><span>{isChinese(settings.locale) ? '仅显示当前用户可观察的数据' : 'Shows data observable by the current user only'}</span></div>
     </section>

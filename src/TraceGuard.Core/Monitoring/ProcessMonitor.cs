@@ -9,6 +9,7 @@ public sealed class ProcessMonitor(Action<TraceEvent> publish, Action<ProcessObs
     private readonly Dictionary<int, (string Name, string? Executable, int? ParentPid)> _known = [];
     private Timer? _timer;
     private int _polling;
+    public bool IsRunning => _timer is not null;
 
     public void Start()
     {

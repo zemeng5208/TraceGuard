@@ -109,6 +109,17 @@ public sealed class EventStore(AppPaths paths)
         return Convert.ToInt64(await command.ExecuteScalarAsync());
     }
 
+    public async Task<long> CountCategorySinceAsync(string category, DateTimeOffset since)
+    {
+        await using var connection = new SqliteConnection(ConnectionString);
+        await connection.OpenAsync();
+        var command = connection.CreateCommand();
+        command.CommandText = "SELECT COUNT(*) FROM events WHERE category = $category AND timestamp >= $since";
+        command.Parameters.AddWithValue("$category", category);
+        command.Parameters.AddWithValue("$since", since.ToString("O"));
+        return Convert.ToInt64(await command.ExecuteScalarAsync());
+    }
+
     public async Task ClearAsync()
     {
         await _gate.WaitAsync();

@@ -82,6 +82,8 @@ export const defaultSettings: AppSettings = {
 export const previewOverview: Overview = {
   fileChanges: 1246,
   registryChanges: 342,
+  fileChangesPerMinute: 38,
+  registryChangesPerMinute: 7,
   processCount: 128,
   serviceCount: 214,
   diskBytesPerSecond: 3.2 * 1024 * 1024,
@@ -89,6 +91,18 @@ export const previewOverview: Overview = {
   cpuPercent: 23,
   memoryPercent: 45,
   monitoring: true,
+  monitoringMode: 'active',
+  onBattery: false,
+  monitorModules: [
+    { id: 'file', state: 'active', message: 'Watching 5 accessible locations.', messageZh: '正在监控 5 个可访问位置。' },
+    { id: 'process', state: 'active', message: 'Polling process starts and exits.', messageZh: '正在观察进程启动与退出。' },
+    { id: 'registry', state: 'active', message: 'Current-user configuration diff every 4s.', messageZh: '每 4 秒比较当前用户配置。' },
+    { id: 'service', state: 'active', message: 'Read-only service comparison every 4s.', messageZh: '每 4 秒只读比较服务状态。' },
+    { id: 'startup', state: 'active', message: 'User startup comparison every 4s.', messageZh: '每 4 秒比较用户启动项。' },
+    { id: 'browser', state: 'disabled', message: 'Disabled in Settings.', messageZh: '已在设置中关闭。' },
+    { id: 'network', state: 'disabled', message: 'Disabled in Settings.', messageZh: '已在设置中关闭。' },
+    { id: 'update', state: 'active', message: 'Windows Update observation is active.', messageZh: 'Windows Update 活动观察正在运行。' },
+  ],
   activeInstaller: { name: 'ABC_Setup.exe', pid: 4528, elapsedSeconds: 204, changeCount: 428 },
 };
 
