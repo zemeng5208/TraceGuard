@@ -1,5 +1,6 @@
 param(
-    [string]$Executable = './release/win-unpacked/TraceGuard.exe'
+    [string]$Executable = './release/win-unpacked/TraceGuard.exe',
+    [string]$Screenshot
 )
 
 $ErrorActionPreference = 'Stop'
@@ -14,6 +15,10 @@ $startInfo.WorkingDirectory = Split-Path -Parent $executablePath.Path
 $startInfo.UseShellExecute = $false
 $startInfo.Environment['TRACEGUARD_SMOKE_FILE'] = $smokeFile
 $startInfo.Environment['TRACEGUARD_SMOKE_EXIT'] = '1'
+if (-not [string]::IsNullOrWhiteSpace($Screenshot)) {
+    $screenshotPath = [System.IO.Path]::GetFullPath($Screenshot)
+    $startInfo.Environment['TRACEGUARD_SMOKE_SCREENSHOT'] = $screenshotPath
+}
 
 $process = [System.Diagnostics.Process]::new()
 $process.StartInfo = $startInfo
@@ -34,11 +39,16 @@ try {
     if (-not $health.coreReady -or $health.processCount -lt 1 -or $health.serviceCount -lt 1) { throw 'Packaged C# Core did not return real system data.' }
     if ($health.monitorModules -lt 10) { throw "Expected 10 collector capability states, found $($health.monitorModules)." }
     if ($health.version -ne $package.version) { throw "Packaged desktop version mismatch: expected $($package.version), found $($health.version)." }
+    if (-not [string]::IsNullOrWhiteSpace($Screenshot)) {
+        if (-not $health.screenshotCaptured -or -not (Test-Path -LiteralPath $screenshotPath)) { throw 'Packaged Dashboard screenshot was not captured.' }
+        $screenshotInfo = Get-Item -LiteralPath $screenshotPath
+        if ($screenshotInfo.Length -lt 50000) { throw "Packaged Dashboard screenshot is unexpectedly small: $($screenshotInfo.Length) bytes." }
+    }
 
     if (-not $process.WaitForExit(15000)) { throw 'Packaged TraceGuard did not exit cleanly after reporting test health.' }
     if ($process.ExitCode -ne 0) { throw "Packaged TraceGuard exited with code $($process.ExitCode)." }
 
-    Write-Host "TraceGuard desktop smoke test passed: version=$($health.version), processes=$($health.processCount), services=$($health.serviceCount), modules=$($health.monitorModules)"
+    Write-Host "TraceGuard desktop smoke test passed: version=$($health.version), processes=$($health.processCount), services=$($health.serviceCount), modules=$($health.monitorModules), screenshot=$($health.screenshotCaptured)"
 }
 finally {
     if (-not $process.HasExited) { & taskkill.exe /PID $process.Id /T /F | Out-Null }

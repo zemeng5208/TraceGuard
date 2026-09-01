@@ -16,7 +16,7 @@
 - [x] Atomic, versioned settings persistence
 - [x] CoreGuard process/service denylist and tests
 - [x] Windows CI build and packaged artifact
-- [ ] Visual browser QA and final fidelity pass (browser runtime unavailable in the current cloud environment)
+- [ ] Final fidelity pass (packaged Windows Dashboard screenshot capture is automated; visual review remains)
 - [x] Windows CI validates .NET tests, C# publish, and renderer build
 - [x] Windows package validation with separate per-user installer and portable artifact names
 - [x] Runtime language switching for native tray, bubble menu, tooltip, and notifications
@@ -69,4 +69,4 @@
 
 ## Next checkpoint
 
-Validate optional ETW attribution and its safe unavailable path in Windows CI, then complete first-release preparation and the documented Windows 10/11 compatibility matrix.
+Capture and visually review the packaged Windows Dashboard, then complete the release workflow and documented Windows 10/11 compatibility matrix.

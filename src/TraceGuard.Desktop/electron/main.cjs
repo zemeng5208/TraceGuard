@@ -212,6 +212,7 @@ function applyWindowSettings() {
 
 async function writeDesktopSmokeStatus() {
   const target = process.env.TRACEGUARD_SMOKE_FILE;
+  const screenshotTarget = process.env.TRACEGUARD_SMOKE_SCREENSHOT;
   if (!target) return;
   const write = (value) => {
     fs.mkdirSync(path.dirname(target), { recursive: true });
@@ -228,6 +229,12 @@ async function writeDesktopSmokeStatus() {
     }
     const rendererReady = await window.webContents.executeJavaScript("Boolean(document.querySelector('.app-shell'))", true);
     const overview = await core.request('getOverview');
+    if (screenshotTarget) {
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+      const image = await window.webContents.capturePage();
+      fs.mkdirSync(path.dirname(screenshotTarget), { recursive: true });
+      fs.writeFileSync(screenshotTarget, image.toPNG());
+    }
     write({
       success: Boolean(rendererReady && overview.processCount > 0 && overview.serviceCount > 0),
       packaged: app.isPackaged,
@@ -237,6 +244,7 @@ async function writeDesktopSmokeStatus() {
       processCount: overview.processCount,
       serviceCount: overview.serviceCount,
       monitorModules: overview.monitorModules?.length ?? 0,
+      screenshotCaptured: screenshotTarget ? fs.existsSync(screenshotTarget) : false,
     });
   } catch (error) {
     write({ success: false, packaged: app.isPackaged, version: app.getVersion(), error: error instanceof Error ? error.message : String(error) });

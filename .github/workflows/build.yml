@@ -31,7 +31,7 @@ jobs:
       - run: npm run package:win
       - name: Smoke-test packaged desktop
         shell: pwsh
-        run: ./scripts/smoke-desktop.ps1
+        run: ./scripts/smoke-desktop.ps1 -Screenshot ./release/TraceGuard-Dashboard-${{ github.sha }}.png
       - name: Smoke-test portable package
         shell: pwsh
         run: ./scripts/smoke-portable.ps1
@@ -46,5 +46,6 @@ jobs:
           name: TraceGuard-windows-x64
           path: |
             release/TraceGuard-*.exe
+            release/TraceGuard-Dashboard-*.png
             release/SHA256SUMS.txt
           if-no-files-found: error

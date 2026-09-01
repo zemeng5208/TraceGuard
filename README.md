@@ -66,6 +66,8 @@ The Windows CI also starts the published core as the runner's ordinary user and 
 
 After packaging, CI launches the complete `win-unpacked` Electron application and verifies that the React application shell mounts, the bundled C# Core starts, real process/service data arrives over IPC, ten collector capability states are present, and the packaged desktop version matches the release metadata. The test then terminates only its own TraceGuard process tree.
 
+The packaged-app check also captures the rendered Dashboard after the Core is ready and publishes the PNG beside the installers as a CI artifact. This makes release visual review use the real Windows/Electron build rather than the browser preview adapter.
+
 The final Portable executable is also launched directly. CI verifies its extraction wrapper, packaged renderer, bundled Core IPC, real system data, version, and clean application shutdown rather than assuming the portable target behaves like the unpacked directory.
 
 CI also performs a silent per-user NSIS installation into an isolated runner directory, launches the installed application through the same full desktop health check, runs the generated uninstaller, and verifies that the installed executable is removed. No administrator permission or machine-wide installation is used.
