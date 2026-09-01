@@ -17,7 +17,8 @@
 - [x] CoreGuard process/service denylist and tests
 - [x] Windows CI build and packaged artifact
 - [ ] Visual browser QA and final fidelity pass (browser runtime unavailable in the current cloud environment)
-- [ ] Windows CI validation for the latest runtime-health checkpoint
+- [x] Windows CI validates .NET tests, C# publish, and renderer build
+- [ ] Windows package validation after disabling implicit CI publishing and separating installer/portable artifact names
 
 ## Phase 2 — complete
 
@@ -57,4 +58,4 @@
 
 ## Next checkpoint
 
-Run the runtime-health checkpoint in Windows CI, then continue with zero-privilege USN/ETW capability evaluation and release packaging.
+Validate both explicitly local-only Windows package targets in CI, then continue with zero-privilege USN/ETW capability evaluation and release packaging.

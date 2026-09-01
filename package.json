@@ -1,6 +1,7 @@
 {
   "name": "traceguard",
   "version": "0.2.0",
+  "author": "TraceGuard contributors",
   "private": true,
   "type": "module",
   "description": "Zero-privilege Windows behavior transparency and monitoring tool.",
@@ -13,7 +14,7 @@
     "build:renderer": "vite build",
     "build": "npm run typecheck && npm run build:renderer",
     "preview": "vite preview --host 127.0.0.1",
-    "package:win": "npm run build && electron-builder --win nsis portable"
+    "package:win": "npm run build && electron-builder --win nsis portable --publish never"
   },
   "dependencies": {
     "@vitejs/plugin-react": "latest",
@@ -58,11 +59,16 @@
       "artifactName": "TraceGuard-${version}-${arch}.${ext}"
     },
     "nsis": {
+      "artifactName": "TraceGuard-Setup-${version}-${arch}.${ext}",
       "oneClick": false,
       "perMachine": false,
       "allowElevation": false,
       "createDesktopShortcut": "always",
       "createStartMenuShortcut": true
+    },
+    "portable": {
+      "artifactName": "TraceGuard-Portable-${version}-${arch}.${ext}",
+      "requestExecutionLevel": "user"
     }
   }
 }
