@@ -137,7 +137,7 @@ public sealed class CoreHost : IDisposable
             if (_settings.FileMonitoring) _files.Start(_settings.FullDiskMonitoring && !_batteryLimited);
             if (_settings.ProcessMonitoring) _processes.Start();
             if (HasConfigurationMonitoring(_settings)) _configurations.Start(_settings);
-            _monitoring = _files.WatcherCount > 0 || _processes.IsRunning || _configurations.IsRunning;
+            _monitoring = _files.ActiveSourceCount > 0 || _processes.IsRunning || _configurations.IsRunning;
         }
     }
 
@@ -163,10 +163,19 @@ public sealed class CoreHost : IDisposable
             }
 
             var configurationRunning = _configurations.IsRunning;
-            var file = Status("file", _settings.FileMonitoring, _files.WatcherCount > 0,
-                _batteryLimited && _settings.FullDiskMonitoring ? "User folders active; full-disk scope is reduced on battery." : $"Watching {_files.WatcherCount} accessible location(s).",
-                _batteryLimited && _settings.FullDiskMonitoring ? "用户目录监控正常；电池供电时已缩减全磁盘范围。" : $"正在监控 {_files.WatcherCount} 个可访问位置。");
+            var file = Status("file", _settings.FileMonitoring, _files.ActiveSourceCount > 0,
+                _batteryLimited && _settings.FullDiskMonitoring ? "User folders active; full-disk scope is reduced on battery." : _files.UsnVolumeCount > 0
+                    ? $"Tailing {_files.UsnVolumeCount} readable NTFS journal(s); {_files.WatcherCount} inaccessible or non-NTFS volume(s) use FileSystemWatcher."
+                    : $"Watching {_files.WatcherCount} accessible location(s).",
+                _batteryLimited && _settings.FullDiskMonitoring ? "用户目录监控正常；电池供电时已缩减全磁盘范围。" : _files.UsnVolumeCount > 0
+                    ? $"正在增量读取 {_files.UsnVolumeCount} 个可读 NTFS 日志；{_files.WatcherCount} 个不可读或非 NTFS 卷使用 FileSystemWatcher。"
+                    : $"正在监控 {_files.WatcherCount} 个可访问位置。");
             if (file.State == "active" && _batteryLimited && _settings.FullDiskMonitoring) file = file with { State = "reduced" };
+            var usn = _files.UsnVolumeCount > 0
+                ? new MonitorModuleStatus("usn", "active",
+                    $"Incrementally reading {_files.UsnVolumeCount} existing NTFS journal(s) with the current user token.",
+                    $"正在使用当前用户令牌增量读取 {_files.UsnVolumeCount} 个现有 NTFS 日志。")
+                : UsnJournalProbe.GetStatus();
             return
             [
                 file,
@@ -177,7 +186,7 @@ public sealed class CoreHost : IDisposable
                 Status("browser", _settings.BrowserMonitoring, configurationRunning, "Browser configuration monitoring is active.", "浏览器配置监控正在运行。"),
                 Status("network", _settings.NetworkMonitoring, configurationRunning, "Network configuration monitoring is active.", "网络配置监控正在运行。"),
                 Status("update", _settings.UpdateMonitoring, configurationRunning, "Windows Update observation is active.", "Windows Update 活动观察正在运行。"),
-                UsnJournalProbe.GetStatus(),
+                usn,
                 EtwCapabilityProbe.GetStatus()
             ];
         }

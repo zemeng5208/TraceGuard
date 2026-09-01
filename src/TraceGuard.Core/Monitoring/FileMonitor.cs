@@ -5,12 +5,19 @@ namespace TraceGuard.Core.Monitoring;
 public sealed class FileMonitor(Action<TraceEvent> publish) : IDisposable
 {
     private readonly List<FileSystemWatcher> _watchers = [];
+    private readonly UsnJournalMonitor _journal = new(publish);
     public int WatcherCount => _watchers.Count;
+    public int UsnVolumeCount => _journal.VolumeCount;
+    public int ActiveSourceCount => WatcherCount + UsnVolumeCount;
 
     public void Start(bool fullDisk)
     {
         Stop();
-        var roots = fullDisk ? DriveInfo.GetDrives().Where(d => d.IsReady && d.DriveType == DriveType.Fixed).Select(d => d.RootDirectory.FullName) : DefaultFolders();
+        IReadOnlySet<string> journalRoots = fullDisk ? _journal.Start() : new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var roots = fullDisk
+            ? DriveInfo.GetDrives().Where(d => d.IsReady && d.DriveType == DriveType.Fixed)
+                .Select(d => d.RootDirectory.FullName).Where(root => !journalRoots.Contains(root))
+            : DefaultFolders();
         foreach (var root in roots.Distinct(StringComparer.OrdinalIgnoreCase)) TryWatch(root);
     }
 
@@ -57,6 +64,7 @@ public sealed class FileMonitor(Action<TraceEvent> publish) : IDisposable
 
     public void Stop()
     {
+        _journal.Stop();
         foreach (var watcher in _watchers) watcher.Dispose();
         _watchers.Clear();
     }

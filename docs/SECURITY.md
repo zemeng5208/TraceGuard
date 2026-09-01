@@ -21,6 +21,10 @@ CoreGuard rejects destructive actions against critical Windows processes and inf
 - Browser monitoring must not read passwords, cookies, form data, or browsing-history content.
 - TraceGuard currently sends no telemetry.
 
+## USN Journal boundary
+
+TraceGuard queries existing NTFS journals read-only. Full-disk monitoring tails only new records on volumes the signed-in user's token can open with `GENERIC_READ`; it does not replay earlier records. It never creates, deletes, resizes, or configures a journal and never enables backup, security, or volume-management privileges. If Windows refuses access, that volume falls back to `FileSystemWatcher` and the limitation remains visible in collector health.
+
 ## ETW boundary
 
 Windows restricts general ETW session control to administrators, the built-in `Performance Log Users` group, and specific service accounts; NT Kernel Logger control is stricter. TraceGuard only inspects the current token for existing `Performance Log Users` membership. It never adds the user to that group, requests elevation, starts a privileged kernel session, or reports provider attribution as active before it is actually implemented and verified.

@@ -60,7 +60,8 @@
 - [x] Real one-minute event rates and event-derived Dashboard chart
 - [x] Remove hard-coded disk/network percentages and sample telemetry from production UI
 - [x] Probe zero-privilege USN Journal readability per NTFS volume without creating or modifying journals
-- [ ] Read and attribute USN journal events on volumes where the current user token is sufficient
+- [x] Incrementally read new USN v2 records on eligible volumes, resolve paths by file ID where accessible, and fall back per-volume without elevation
+- [ ] Correlate USN changes with the exact originating process (currently reported as best-effort installer-session attribution)
 - [x] Evaluate current-token eligibility for user-session ETW control without requiring elevation
 - [ ] Enable and consume explicitly supported user-mode ETW providers only when the current token is eligible
 - [ ] Complete Windows 10/11 hardware compatibility testing (automated Windows runner coverage is complete)
@@ -68,4 +69,4 @@
 
 ## Next checkpoint
 
-Validate the final Portable wrapper in Windows CI, then continue with zero-privilege USN event reading and first-release preparation.
+Validate the zero-privilege USN reader and final Portable wrapper in Windows CI, then continue with ETW provider consumption and first-release preparation.

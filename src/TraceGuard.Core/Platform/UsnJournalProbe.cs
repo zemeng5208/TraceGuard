@@ -68,8 +68,8 @@ public static class UsnJournalProbe
         {
             var volumes = string.Join(", ", readable);
             return new("usn", "available",
-                $"Readable with the current user token on {volumes}. FileSystemWatcher remains active until journal event attribution is enabled.",
-                $"当前用户令牌可读取 {volumes}。在 USN 事件归属功能启用前仍继续使用 FileSystemWatcher。");
+                $"Readable with the current user token on {volumes}. Enable full-disk monitoring to tail new journal records.",
+                $"当前用户令牌可读取 {volumes}。开启全磁盘监控后可增量读取新的日志记录。");
         }
         if (ntfsVolumes == 0) return Unavailable("No ready local NTFS volume was found.", "未发现已就绪的本地 NTFS 卷。");
         if (accessDenied.Count > 0)
