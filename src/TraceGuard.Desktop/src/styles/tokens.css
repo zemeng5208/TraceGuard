@@ -37,10 +37,17 @@
   --glass-2: rgba(255, 255, 255, .52);
   --glass-hover: rgba(70, 135, 197, .12);
   --line: rgba(33, 75, 110, .13);
-  --line-strong: rgba(255, 255, 255, .78);
-  --text: #102334;
-  --muted: #4f687b;
-  --dim: #7790a2;
+  --line-strong: rgba(31, 83, 126, .24);
+  --text: #102536;
+  --muted: #425f75;
+  --dim: #617c91;
+  --blue: #176db8;
+  --purple: #7952ad;
+  --green: #268258;
+  --cyan: #197a84;
+  --orange: #a9532d;
+  --red: #b94f55;
+  --pink: #a84f7b;
 }
 
 :root[data-density='compact'] { font-size: 13px; }

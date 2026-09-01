@@ -23,7 +23,7 @@ export function DashboardPage({ overview, events, settings, onViewReports }: { o
           <MetricCard labelKey="fileChanges" value={(overview?.fileChanges ?? 0).toLocaleString()} detail={`+${overview?.fileChangesPerMinute ?? 0} /min`} tone="blue" settings={settings} />
           <MetricCard labelKey="registryChanges" value={(overview?.registryChanges ?? 0).toLocaleString()} detail={`+${overview?.registryChangesPerMinute ?? 0} /min`} tone="purple" settings={settings} />
           <MetricCard labelKey="processes" value={String(overview?.processCount ?? 0)} detail={text('running', settings.locale)} tone="cyan" settings={settings} />
-          <MetricCard labelKey="services" value={String(overview?.serviceCount ?? 0)} detail={text('running', settings.locale)} tone="green" settings={settings} />
+          <MetricCard labelKey="services" value={String(overview?.serviceCount ?? 0)} detail={isZh ? '可见服务总数' : 'Total visible services'} tone="green" settings={settings} />
           <MetricCard labelKey="diskRead" value={bytesRate(overview?.diskBytesPerSecond)} detail={isZh ? '可读进程实时值' : 'Readable processes · live'} tone="blue" settings={settings} />
           <MetricCard labelKey="networkSend" value={bytesRate(overview?.networkBytesPerSecond)} detail={isZh ? '网卡实时总量' : 'Interfaces · live'} tone="purple" settings={settings} />
         </div>
