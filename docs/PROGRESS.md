@@ -24,6 +24,7 @@
 - [x] Duplicate startup/scheduled-task rows are deterministically de-duplicated without hiding distinct commands
 - [x] Release artifact structure, PE headers, minimum sizes, and SHA-256 checksums are validated in CI
 - [x] Evaluate current-token ETW session eligibility without starting a session or changing permissions
+- [x] Renderer, About page, Windows artifact, and .NET executable versions normalized to 0.2.0
 
 ## Phase 2 — complete
 

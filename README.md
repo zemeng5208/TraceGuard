@@ -7,7 +7,7 @@ TraceGuard is a local-first Windows 10/11 desktop application that explains soft
 
 ## Current status
 
-Phase 1 and the planned Phase 2/3 observation flows are implemented. The current build contains the Electron + React desktop shell, bilingual premium-glass UI, structured live terminal, floating surfaces, a working .NET 8 observation core, CoreGuard, local persistence, installer behavior sessions, process launch chains, registry before/after diffs, user-level startup control, current-user Block Auto-Restart rules, browser/network/default-app baselines, Windows Update activity, exportable behavior reports, and truthful runtime collector health.
+Version `0.2.0` is the current MVP development build. Phase 1 and the planned Phase 2/3 observation flows are implemented. The current build contains the Electron + React desktop shell, bilingual premium-glass UI, structured live terminal, floating surfaces, a working .NET 8 observation core, CoreGuard, local persistence, installer behavior sessions, process launch chains, registry before/after diffs, user-level startup control, current-user Block Auto-Restart rules, browser/network/default-app baselines, Windows Update activity, exportable behavior reports, and truthful runtime collector health.
 
 ## Safety model
 

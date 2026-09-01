@@ -19,6 +19,7 @@ import {
 import { Brand } from '@/components/Brand';
 import { secondaryText, text } from '@/i18n';
 import type { AppSettings } from '@/types';
+import { TRACEGUARD_VERSION } from '@/version';
 
 export type PageId =
   | 'dashboard'
@@ -93,7 +94,7 @@ export function Sidebar({ active, onSelect, settings }: SidebarProps) {
           <ShieldCheck size={16} />
           {compact ? null : <span><b>CoreGuard</b><small>● {text('on', settings.locale)}</small></span>}
         </div>
-        {compact ? null : <div className="version-row"><span>v0.2.0</span><span>Phase 2</span></div>}
+        {compact ? null : <div className="version-row"><span>v{TRACEGUARD_VERSION}</span><span>MVP</span></div>}
       </div>
     </aside>
   );

@@ -7,6 +7,9 @@
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <AssemblyName>TraceGuard.Core</AssemblyName>
     <RootNamespace>TraceGuard.Core</RootNamespace>
+    <Version>0.2.0</Version>
+    <AssemblyVersion>0.2.0.0</AssemblyVersion>
+    <FileVersion>0.2.0.0</FileVersion>
     <RuntimeIdentifiers>win-x64</RuntimeIdentifiers>
   </PropertyGroup>
   <ItemGroup>
