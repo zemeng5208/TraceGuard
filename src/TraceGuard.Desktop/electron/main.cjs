@@ -1,5 +1,6 @@
 const { app, BrowserWindow, globalShortcut, ipcMain, Menu, nativeTheme, screen } = require('electron');
 const path = require('node:path');
+const { pathToFileURL } = require('node:url');
 const { CoreClient } = require('./core-client.cjs');
 
 const isDev = Boolean(process.env.VITE_DEV_SERVER_URL);
@@ -11,7 +12,7 @@ const rendererUrl = (surface) => {
   const query = surface === 'main' ? '' : `?surface=${surface}`;
   return isDev
     ? `${process.env.VITE_DEV_SERVER_URL}/${query}`
-    : `file://${path.join(app.getAppPath(), 'dist', 'index.html')}${query}`;
+    : `${pathToFileURL(path.join(app.getAppPath(), 'dist', 'index.html')).toString()}${query}`;
 };
 
 const commonOptions = {

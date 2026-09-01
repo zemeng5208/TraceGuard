@@ -1,4 +1,0 @@
-<Solution>
-  <Project Path="src/TraceGuard.Core/TraceGuard.Core.csproj" />
-  <Project Path="tests/TraceGuard.Core.Tests/TraceGuard.Core.Tests.csproj" />
-</Solution>
