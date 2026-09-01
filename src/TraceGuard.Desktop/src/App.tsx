@@ -47,7 +47,8 @@ export function App() {
   useEffect(() => {
     void api.getSettings().then(setSettings).catch(() => setSettings(defaultSettings));
     void refresh();
-    const interval = window.setInterval(refresh, settings.lowPowerMode ? 5000 : 2000);
+    const refreshMs = settings.lowPowerMode ? 5000 : surface === 'widget' ? settings.widgetRefreshMs : 2000;
+    const interval = window.setInterval(refresh, refreshMs);
     const unsubscribe = api.onTraceEvent((event) => {
       setEvents((current) => [event, ...current.filter((item) => item.id !== event.id)].slice(0, settings.terminalMaxRows));
     });
@@ -55,7 +56,7 @@ export function App() {
       window.clearInterval(interval);
       unsubscribe();
     };
-  }, [refresh, settings.lowPowerMode, settings.terminalMaxRows]);
+  }, [refresh, settings.lowPowerMode, settings.terminalMaxRows, settings.widgetRefreshMs, surface]);
 
   const updateSettings = useCallback((patch: Partial<AppSettings>) => {
     setSettings((current) => {
@@ -88,6 +89,15 @@ export function App() {
       setPage(nextPage as PageId);
     }
   }), []);
+
+  useEffect(() => {
+    if (settings.restoreLastPage) {
+      const saved = localStorage.getItem('traceguard:last-page');
+      if (saved && ['dashboard', 'terminal', 'processes', 'services', 'disk', 'network', 'update', 'files', 'registry', 'startup', 'browser', 'rules', 'restore', 'settings'].includes(saved)) setPage(saved as PageId);
+    }
+  }, [settings.restoreLastPage]);
+
+  useEffect(() => { localStorage.setItem('traceguard:last-page', page); }, [page]);
 
   if (surface === 'widget') return <WidgetSurface overview={overview} events={events} settings={settings} />;
   if (surface === 'bubble') return <BubbleSurface overview={overview} events={events} settings={settings} />;
