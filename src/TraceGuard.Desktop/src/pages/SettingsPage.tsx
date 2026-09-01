@@ -1,5 +1,5 @@
 import {
-  Bell, Bot, ChevronRight, CircleHelp, Database, Eye, Languages, LayoutDashboard,
+  Bell, Bot, CircleHelp, Database, Eye, Languages,
   MonitorCog, Palette, Power, Search, Settings2, ShieldCheck, SlidersHorizontal,
   Sparkles, TerminalSquare, PanelsTopLeft,
 } from 'lucide-react';

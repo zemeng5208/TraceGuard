@@ -109,6 +109,7 @@ body::after { width: 34vw; height: 16vh; right: 8vw; top: 1vh; background: rgba(
 .installer-stats dd { margin: 0; color: var(--green); font-size: .72rem; }
 .primary-button, .install-toast button { width: 100%; height: 30px; border: 1px solid rgba(103, 174, 255, .33); border-radius: 8px; color: #e9f6ff; background: linear-gradient(180deg, rgba(47, 123, 210, .48), rgba(23, 81, 153, .42)); box-shadow: inset 0 1px rgba(255,255,255,.11), 0 6px 18px rgba(0, 92, 189, .15); cursor: pointer; }
 .primary-button span { color: rgba(232,244,255,.6); font-size: .58rem; }
+.primary-button:disabled, .install-toast button:disabled { opacity: .48; cursor: not-allowed; filter: saturate(.55); }
 .empty-state { display: grid; place-items: center; min-height: 150px; color: var(--dim); }
 .event-list { margin-top: 6px; }
 .event-row { display: grid; grid-template-columns: 9px 50px minmax(0, 1fr) 95px 14px; gap: 7px; align-items: center; min-height: 32px; border-bottom: 1px solid rgba(193, 222, 243, .055); }

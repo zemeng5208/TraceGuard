@@ -1,6 +1,9 @@
 import { ChevronRight, Disc3, ShieldAlert } from 'lucide-react';
 import { isChinese, secondaryText, text } from '@/i18n';
 import type { AppSettings, Overview, TraceEvent } from '@/types';
+import { traceGuardApi } from '@/bridge';
+
+const api = traceGuardApi();
 
 export function MetricCard({
   labelKey,
@@ -72,7 +75,7 @@ export function InstallerPanel({ overview, settings }: { overview: Overview | nu
         <>
           <div className="installer-file"><span className="installer-icon"><Disc3 size={17} /></span><div><strong>{installer.name}</strong><small>PID: {installer.pid}</small></div><em>REC</em></div>
           <dl className="installer-stats"><div><dt>{isChinese(settings.locale) ? '监控时长' : 'Elapsed'}</dt><dd>{elapsed}</dd></div><div><dt>{isChinese(settings.locale) ? '检测到变化' : 'Changes'}</dt><dd>{installer.changeCount}</dd></div></dl>
-          <button type="button" className="primary-button">{text('viewReport', settings.locale)} <span>{secondaryText('viewReport', settings.locale)}</span></button>
+          <button type="button" className="primary-button" disabled title={isChinese(settings.locale) ? '安装报告将在 Phase 2 启用' : 'Installation reports are enabled in Phase 2'}>{text('viewReport', settings.locale)} <span>Phase 2</span></button>
         </>
       ) : <div className="empty-state">{isChinese(settings.locale) ? '未检测到活动安装程序' : 'No active installer detected'}</div>}
     </section>
@@ -94,7 +97,7 @@ export function EventFeed({ events, settings, limit = 5 }: { events: TraceEvent[
           </div>
         ))}
       </div>
-      <button className="text-button" type="button">{isChinese(settings.locale) ? '查看更多' : 'View all'} <span>{isChinese(settings.locale) ? 'View All' : '查看更多'}</span></button>
+      <button className="text-button" type="button" onClick={() => void api.showSurface('terminal')}>{isChinese(settings.locale) ? '查看更多' : 'View all'} <span>{isChinese(settings.locale) ? 'View All' : '查看更多'}</span></button>
     </section>
   );
 }

@@ -27,7 +27,7 @@ export function WidgetSurface({ overview, settings }: { overview: Overview | nul
 export function BubbleSurface({ overview, events, settings }: { overview: Overview | null; events: TraceEvent[]; settings: AppSettings }) {
   const count = events.filter((event) => event.severity === 'critical' || event.severity === 'important').length;
   return <main className="bubble-canvas" onDoubleClick={() => void api.showSurface('main')}>
-    <button type="button" className={`trace-orb orb-${settings.bubbleSize}`} aria-label="Open TraceGuard"><span> TG </span>{overview?.monitoring ? <i /> : null}{settings.showBadgeCount && count ? <b>⚠ {count}</b> : null}</button>
+    <button type="button" className={`trace-orb orb-${settings.bubbleSize}`} aria-label="Open TraceGuard" onClick={() => void api.showSurface('widget')}><span> TG </span>{overview?.monitoring ? <i /> : null}{settings.showBadgeCount && count ? <b>⚠ {count}</b> : null}</button>
   </main>;
 }
 
@@ -37,5 +37,5 @@ export function TerminalSurface({ events, settings }: { events: TraceEvent[]; se
 
 export function InstallationToast({ settings }: { settings: AppSettings }) {
   const isZh = isChinese(settings.locale);
-  return <section className="install-toast glass-window"><span className="complete-icon"><Check size={19} /></span><div><strong>{isZh ? '安装完成' : 'Installation Completed'}</strong><small>ABC Player</small><p>{isZh ? '共检测到 428 个系统变化' : '428 system changes'}<br /><b>{isZh ? '3 个重要变化' : '3 important changes'}</b></p><button type="button">{isZh ? '查看报告' : 'View Report'}</button></div></section>;
+  return <section className="install-toast glass-window"><span className="complete-icon"><Check size={19} /></span><div><strong>{isZh ? '安装完成' : 'Installation Completed'}</strong><small>ABC Player</small><p>{isZh ? '共检测到 428 个系统变化' : '428 system changes'}<br /><b>{isZh ? '3 个重要变化' : '3 important changes'}</b></p><button type="button" disabled>{isZh ? 'Phase 2 启用' : 'Available in Phase 2'}</button></div></section>;
 }
