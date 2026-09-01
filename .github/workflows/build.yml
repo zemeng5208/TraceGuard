@@ -1,0 +1,32 @@
+name: Build TraceGuard
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: dotnet test TraceGuard.slnx --configuration Release
+      - run: dotnet publish src/TraceGuard.Core/TraceGuard.Core.csproj --configuration Release --runtime win-x64 --self-contained true
+      - run: npm run build
+      - run: npm run package:win
+      - uses: actions/upload-artifact@v4
+        with:
+          name: TraceGuard-windows-x64
+          path: release/TraceGuard-*.exe
+          if-no-files-found: error

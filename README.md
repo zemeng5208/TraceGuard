@@ -7,7 +7,7 @@ TraceGuard is a local-first Windows 10/11 desktop application that explains soft
 
 ## Current status
 
-Phase 1 MVP is in active development. The current checkpoint contains the Electron + React desktop shell, bilingual UI foundations, dashboard, structured live terminal, process/service/startup views, and the contract for the Windows core.
+Phase 1 MVP is in active development. The current build contains the Electron + React desktop shell, bilingual UI, premium glass dashboard and Settings experience, structured live terminal, floating surfaces, a working .NET 8 observation core, CoreGuard, and local persistence.
 
 ## Safety model
 
@@ -70,3 +70,7 @@ pnpm package:win
 ## Known limitations
 
 TraceGuard does not request administrator permission. Some system services, protected processes, and machine-level configuration can therefore be observed but cannot be controlled. This is expected behavior under the Windows security model.
+
+Phase 1 file monitoring uses Windows `FileSystemWatcher` and records metadata within the current user's accessible scope. The NTFS USN Journal and ETW attribution are planned for Phase 4. Disk throughput is intentionally reported as unavailable in production until a reliable zero-privilege sampler is implemented; the UI does not invent a value.
+
+See [architecture](docs/ARCHITECTURE.md), [security model](docs/SECURITY.md), and [development progress](docs/PROGRESS.md).
