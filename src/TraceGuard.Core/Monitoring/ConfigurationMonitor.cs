@@ -33,8 +33,8 @@ public sealed class ConfigurationMonitor(Action<TraceEvent> publish) : IDisposab
         if (_settings.BrowserMonitoring) _browserBaseline = Index(SystemConfigurationCollectors.BrowserItems());
         if (_settings.NetworkMonitoring) _networkBaseline = Index(SystemConfigurationCollectors.NetworkItems());
         if (_settings.UpdateMonitoring) _updateBaseline = Index(SystemConfigurationCollectors.WindowsUpdateItems());
-        if (_settings.StartupMonitoring) _startupBaseline = WindowsCollectors.StartupItems().ToDictionary(StartupKey, StringComparer.OrdinalIgnoreCase);
-        if (_settings.ServiceMonitoring) _serviceBaseline = WindowsCollectors.Services().ToDictionary(item => item.Name, StringComparer.OrdinalIgnoreCase);
+        if (_settings.StartupMonitoring) _startupBaseline = IndexStartupItems(WindowsCollectors.StartupItems());
+        if (_settings.ServiceMonitoring) _serviceBaseline = IndexServices(WindowsCollectors.Services());
     }
 
     private void Poll()
@@ -88,7 +88,7 @@ public sealed class ConfigurationMonitor(Action<TraceEvent> publish) : IDisposab
 
     private void PollStartup()
     {
-        var next = WindowsCollectors.StartupItems().ToDictionary(StartupKey, StringComparer.OrdinalIgnoreCase);
+        var next = IndexStartupItems(WindowsCollectors.StartupItems());
         foreach (var item in next.Values.Where(item => !_startupBaseline.ContainsKey(StartupKey(item))))
             publish(new TraceEvent(0, DateTimeOffset.UtcNow, "startup", "ADD", "A startup item was added", "新增了自启动项", $"{item.Name} · {item.Command} · {item.Source}", null, null, "important"));
         foreach (var item in _startupBaseline.Values.Where(item => !next.ContainsKey(StartupKey(item))))
@@ -98,7 +98,7 @@ public sealed class ConfigurationMonitor(Action<TraceEvent> publish) : IDisposab
 
     private void PollServices()
     {
-        var next = WindowsCollectors.Services().ToDictionary(item => item.Name, StringComparer.OrdinalIgnoreCase);
+        var next = IndexServices(WindowsCollectors.Services());
         foreach (var item in next.Values)
         {
             if (!_serviceBaseline.TryGetValue(item.Name, out var previous))
@@ -113,7 +113,11 @@ public sealed class ConfigurationMonitor(Action<TraceEvent> publish) : IDisposab
 
     private static Dictionary<string, ConfigurationItem> Index(IReadOnlyList<ConfigurationItem> items) =>
         items.GroupBy(item => item.Id, StringComparer.OrdinalIgnoreCase).ToDictionary(group => group.Key, group => group.Last(), StringComparer.OrdinalIgnoreCase);
-    private static string StartupKey(StartupRow item) => $"{item.Source}::{item.Name}";
+    internal static Dictionary<string, StartupRow> IndexStartupItems(IEnumerable<StartupRow> items) =>
+        items.GroupBy(StartupKey, StringComparer.OrdinalIgnoreCase).ToDictionary(group => group.Key, group => group.Last(), StringComparer.OrdinalIgnoreCase);
+    private static Dictionary<string, ServiceRow> IndexServices(IEnumerable<ServiceRow> items) =>
+        items.GroupBy(item => item.Name, StringComparer.OrdinalIgnoreCase).ToDictionary(group => group.Key, group => group.Last(), StringComparer.OrdinalIgnoreCase);
+    private static string StartupKey(StartupRow item) => $"{item.Source}::{item.Name}::{item.Command}";
     private static string Display(string? value) => string.IsNullOrWhiteSpace(value) ? "(none)" : value;
     private static string RegistryVerbZh(string value) => value switch { "created" => "创建", "modified" => "修改", "deleted" => "删除", _ => "变更" };
 

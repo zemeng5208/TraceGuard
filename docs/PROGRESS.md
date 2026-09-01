@@ -21,6 +21,7 @@
 - [x] Windows package validation with separate per-user installer and portable artifact names
 - [x] Runtime language switching for native tray, bubble menu, tooltip, and notifications
 - [x] Published-core IPC smoke test running as the ordinary Windows CI user
+- [x] Duplicate startup/scheduled-task rows are deterministically de-duplicated without hiding distinct commands
 
 ## Phase 2 — complete
 
