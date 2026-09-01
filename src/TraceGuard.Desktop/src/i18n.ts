@@ -68,7 +68,6 @@ export const copy: Record<string, Copy> = {
   off: { en: 'Off', zh: '关闭' },
   requiresElevation: { en: 'Requires elevated permission. TraceGuard will not request administrator rights.', zh: '需要更高权限，TraceGuard 零提权模式不会请求管理员权限。' },
   protectedCore: { en: 'Protected Windows Core Component', zh: 'Windows 核心受保护组件' },
-  phasePlanned: { en: 'This module is planned for a later phase.', zh: '此模块将在后续阶段实现。' },
 };
 
 export const resolvedLocale = (locale: Locale): 'en-US' | 'zh-CN' => {

@@ -1,4 +1,4 @@
-import type { AppSettings, InstallationSession, Overview, ProcessRow, ServiceRow, StartupRow, TraceEvent, TraceRule } from '@/types';
+import type { AppSettings, ConfigurationItem, InstallationSession, Overview, ProcessRow, RestoreItem, ServiceRow, StartupRow, TraceEvent, TraceRule } from '@/types';
 
 export const defaultSettings: AppSettings = {
   schemaVersion: 1,
@@ -39,14 +39,26 @@ export const defaultSettings: AppSettings = {
   bubbleSize: 'medium',
   bubbleLabel: 'tg',
   showBadgeCount: true,
+  showUpdateStatus: true,
+  showRecordingStatus: true,
   hoverPreview: true,
   hoverDelayMs: 500,
+  bubbleSingleClickAction: 'panel',
+  bubbleDoubleClickAction: 'console',
   terminalMode: 'easy',
   terminalAutoScroll: true,
   terminalTimestampMilliseconds: false,
   terminalMaxRows: 1000,
   notificationLevel: 'important',
   notificationSound: true,
+  notifySystemChange: true,
+  notifyStartup: true,
+  notifyService: true,
+  notifyBrowser: true,
+  notifyBlockedRestart: true,
+  notifyInstallerComplete: true,
+  notifyWindowsUpdate: false,
+  notifyUserFiles: true,
   launchAtSignIn: false,
   keepMonitoringOnClose: true,
   lowPowerMode: false,
@@ -125,6 +137,28 @@ export const previewStartup: StartupRow[] = [
   { name: 'UpdateHelper', command: 'C:\\ProgramData\\ABC\\UpdateHelper.exe --background', source: 'run', enabled: true, permission: 'controllable' },
   { name: 'OneDrive', command: 'C:\\Users\\John\\AppData\\Local\\Microsoft\\OneDrive\\OneDrive.exe /background', source: 'run', enabled: true, permission: 'controllable' },
   { name: 'SecurityHealth', command: '%windir%\\system32\\SecurityHealthSystray.exe', source: 'run', enabled: true, permission: 'protected' },
+];
+
+export const previewRestoreItems: RestoreItem[] = [
+  { id: 'restore-1', name: 'LegacyUpdater', source: 'run', originalCommand: 'C:\\Users\\John\\AppData\\Local\\Legacy\\Updater.exe', disabledAt: new Date(now - 86_400_000).toISOString(), permission: 'controllable' },
+];
+
+export const previewBrowserItems: ConfigurationItem[] = [
+  { id: 'chrome.homepage', category: 'homepage', name: 'Google Chrome homepage', value: 'https://www.google.com', source: 'Chrome Preferences', permission: 'observable', description: 'Browser homepage configuration.', descriptionZh: '浏览器主页配置。', severity: 'important' },
+  { id: 'chrome.extension.demo', category: 'extension', name: 'Google Docs Offline', value: '1.75.0', source: 'Chrome Extensions', permission: 'observable', description: 'Installed browser extension metadata.', descriptionZh: '已安装浏览器扩展的元数据。', severity: 'important' },
+];
+export const previewNetworkItems: ConfigurationItem[] = [
+  { id: 'proxy.enabled', category: 'proxy', name: 'Proxy enabled', value: '0', source: 'HKCU Internet Settings', permission: 'observable', description: 'Current-user proxy state.', descriptionZh: '当前用户代理状态。', severity: 'important' },
+  { id: 'dns.preview', category: 'dns', name: 'Ethernet', value: '1.1.1.1, 8.8.8.8', source: 'Ethernet', permission: 'observable', description: 'DNS servers for this adapter.', descriptionZh: '该网络适配器的 DNS 服务器。', severity: 'normal' },
+  { id: 'hosts.metadata', category: 'hosts', name: 'Hosts file', value: '824 bytes · 2026-09-01T06:00:00Z', source: 'C:\\Windows\\System32\\drivers\\etc\\hosts', permission: 'observable', description: 'Metadata only; contents are never read.', descriptionZh: '仅记录元数据，不读取文件正文。', severity: 'important' },
+];
+export const previewUpdateItems: ConfigurationItem[] = [
+  { id: 'update.service.wuauserv', category: 'service', name: 'Windows Update', value: 'Running', source: 'wuauserv', permission: 'protected', description: 'Observed but never force-stopped.', descriptionZh: '仅供观察，TraceGuard 不会强制停止。', severity: 'normal' },
+  { id: 'update.process.TiWorker', category: 'process', name: 'TiWorker.exe', value: 'Running · 1', source: 'Windows Update', permission: 'protected', description: 'An update worker is active.', descriptionZh: 'Windows 更新工作进程正在运行。', severity: 'important' },
+];
+export const previewAssociationItems: ConfigurationItem[] = [
+  { id: 'association.pdf', category: 'pdf', name: '.pdf', value: 'AcroExch.Document.DC', source: 'HKCU\\…\\UserChoice', permission: 'observable', description: 'Current-user default application association.', descriptionZh: '当前用户默认应用关联。', severity: 'important' },
+  { id: 'association.https', category: 'https', name: 'HTTPS', value: 'ChromeHTML', source: 'HKCU\\…\\UserChoice', permission: 'observable', description: 'Current-user default application association.', descriptionZh: '当前用户默认应用关联。', severity: 'important' },
 ];
 
 export const previewSessions: InstallationSession[] = [{

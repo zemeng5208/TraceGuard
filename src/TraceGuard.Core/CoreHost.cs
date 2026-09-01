@@ -15,6 +15,7 @@ public sealed class CoreHost : IDisposable
     private readonly ProcessMonitor _processes;
     private readonly InstallationSessionTracker _sessions;
     private readonly RuleEngine _rules;
+    private readonly ConfigurationMonitor _configurations;
     private readonly SystemSampler _sampler = new();
     private AppSettings _settings = new();
     private bool _monitoring;
@@ -26,6 +27,7 @@ public sealed class CoreHost : IDisposable
         _files = new FileMonitor(item => QueueEvent(item, publish));
         _sessions = new InstallationSessionTracker(_events, new RegistrySnapshotService(), item => QueueEvent(item, publish));
         _rules = new RuleEngine(_events, item => QueueEvent(item, publish));
+        _configurations = new ConfigurationMonitor(item => QueueEvent(item, publish));
         _processes = new ProcessMonitor(item => QueueEvent(item, publish), observation => { _sessions.OnProcess(observation); _rules.OnProcess(observation); });
     }
 
@@ -59,11 +61,18 @@ public sealed class CoreHost : IDisposable
     public IReadOnlyList<ProcessRow> GetProcesses() => WindowsCollectors.Processes();
     public IReadOnlyList<ServiceRow> GetServices() => WindowsCollectors.Services();
     public IReadOnlyList<StartupRow> GetStartupItems() => WindowsCollectors.StartupItems();
+    public IReadOnlyList<RestoreItem> GetRestoreItems() => WindowsCollectors.RestoreItems();
+    public IReadOnlyList<ConfigurationItem> GetBrowserItems() => SystemConfigurationCollectors.BrowserItems();
+    public IReadOnlyList<ConfigurationItem> GetNetworkItems() => SystemConfigurationCollectors.NetworkItems();
+    public IReadOnlyList<ConfigurationItem> GetWindowsUpdateItems() => SystemConfigurationCollectors.WindowsUpdateItems();
+    public IReadOnlyList<ConfigurationItem> GetFileAssociationItems() => SystemConfigurationCollectors.FileAssociationItems();
     public Task<IReadOnlyList<InstallationSession>> GetSessionsAsync(int limit) => _events.GetSessionsAsync(limit);
+    public Task<StorageInfo> GetStorageInfoAsync() => _events.GetStorageInfoAsync();
     public IReadOnlyList<TraceRule> GetRules() => _rules.Rules;
     public Task<TraceRule> SaveRuleAsync(TraceRule rule) => _rules.SaveAsync(rule);
     public async Task<ActionResult> DeleteRuleAsync(string id) { await _rules.DeleteAsync(id); return new(true, "Rule deleted.", "规则已删除。"); }
     public ActionResult DisableStartup(string name, string source) => WindowsCollectors.DisableStartup(name, source);
+    public ActionResult RestoreStartup(string id) => WindowsCollectors.RestoreStartup(id);
     public AppSettings GetSettings() => _settings;
 
     public async Task<AppSettings> UpdateSettingsAsync(AppSettings settings)
@@ -92,12 +101,16 @@ public sealed class CoreHost : IDisposable
         await _events.ClearAsync();
         return new(true, "Event history cleared.", "事件历史已清空。");
     }
+    public async Task<ActionResult> ClearReportsAsync() { await _events.ClearReportsAsync(); return new(true, "Installation reports cleared.", "安装报告已清除。"); }
+    public async Task<ActionResult> ResetDatabaseAsync() { await _events.ResetAsync(); await _rules.InitializeAsync(); return new(true, "Local database reset.", "本地数据库已重置。"); }
 
     private void StartMonitoring()
     {
         StopMonitoring();
-        if (_settings.FileMonitoring) _files.Start(_settings.FullDiskMonitoring);
+        var batteryLimited = _settings.PauseOnBattery && PowerStatus.IsOnBattery();
+        if (_settings.FileMonitoring) _files.Start(_settings.FullDiskMonitoring && !batteryLimited);
         if (_settings.ProcessMonitoring) _processes.Start();
+        _configurations.Start(_settings);
         _monitoring = true;
     }
 
@@ -105,6 +118,7 @@ public sealed class CoreHost : IDisposable
     {
         _files.Stop();
         _processes.Stop();
+        _configurations.Stop();
         _monitoring = false;
     }
 
@@ -141,5 +155,6 @@ public sealed class CoreHost : IDisposable
         StopMonitoring();
         _files.Dispose();
         _processes.Dispose();
+        _configurations.Dispose();
     }
 }

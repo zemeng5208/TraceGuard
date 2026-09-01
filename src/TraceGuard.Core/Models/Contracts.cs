@@ -37,6 +37,9 @@ public sealed record TraceEvent(
 public sealed record ProcessRow(int Pid, int? ParentPid, string Name, string? Executable, double CpuPercent, long MemoryBytes, string? Publisher, string Permission);
 public sealed record ServiceRow(string Name, string DisplayName, string Status, string StartType, string? Executable, string? Publisher, string Category, string Permission);
 public sealed record StartupRow(string Name, string Command, string Source, bool Enabled, string Permission);
+public sealed record RestoreItem(string Id, string Name, string Source, string OriginalCommand, DateTimeOffset DisabledAt, string Permission);
+public sealed record ConfigurationItem(string Id, string Category, string Name, string Value, string Source, string Permission, string Description, string DescriptionZh, string Severity = "normal");
+public sealed record StorageInfo(string DatabasePath, long DatabaseBytes, long EventCount, long ReportCount, long RuleCount);
 
 public sealed record ProcessObservation(int Pid, int? ParentPid, string Name, string? Executable, bool Started, DateTimeOffset Timestamp);
 public sealed record RegistryChange(string Hive, string Path, string ValueName, string ChangeType, string? OldValue, string? NewValue, string Severity);
@@ -104,14 +107,26 @@ public sealed record AppSettings
     public string BubbleSize { get; init; } = "medium";
     public string BubbleLabel { get; init; } = "tg";
     public bool ShowBadgeCount { get; init; } = true;
+    public bool ShowUpdateStatus { get; init; } = true;
+    public bool ShowRecordingStatus { get; init; } = true;
     public bool HoverPreview { get; init; } = true;
     public int HoverDelayMs { get; init; } = 500;
+    public string BubbleSingleClickAction { get; init; } = "panel";
+    public string BubbleDoubleClickAction { get; init; } = "console";
     public string TerminalMode { get; init; } = "easy";
     public bool TerminalAutoScroll { get; init; } = true;
     public bool TerminalTimestampMilliseconds { get; init; }
     public int TerminalMaxRows { get; init; } = 1000;
     public string NotificationLevel { get; init; } = "important";
     public bool NotificationSound { get; init; } = true;
+    public bool NotifySystemChange { get; init; } = true;
+    public bool NotifyStartup { get; init; } = true;
+    public bool NotifyService { get; init; } = true;
+    public bool NotifyBrowser { get; init; } = true;
+    public bool NotifyBlockedRestart { get; init; } = true;
+    public bool NotifyInstallerComplete { get; init; } = true;
+    public bool NotifyWindowsUpdate { get; init; }
+    public bool NotifyUserFiles { get; init; } = true;
     public bool LaunchAtSignIn { get; init; }
     public bool KeepMonitoringOnClose { get; init; } = true;
     public bool LowPowerMode { get; init; }

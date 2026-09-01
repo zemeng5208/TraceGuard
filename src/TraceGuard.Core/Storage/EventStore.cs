@@ -123,6 +123,48 @@ public sealed class EventStore(AppPaths paths)
         finally { _gate.Release(); }
     }
 
+    public async Task ClearReportsAsync()
+    {
+        await _gate.WaitAsync();
+        try
+        {
+            await using var connection = new SqliteConnection(ConnectionString);
+            await connection.OpenAsync();
+            var command = connection.CreateCommand();
+            command.CommandText = "DELETE FROM installation_sessions";
+            await command.ExecuteNonQueryAsync();
+        }
+        finally { _gate.Release(); }
+    }
+
+    public async Task ResetAsync()
+    {
+        await _gate.WaitAsync();
+        try
+        {
+            await using var connection = new SqliteConnection(ConnectionString);
+            await connection.OpenAsync();
+            var command = connection.CreateCommand();
+            command.CommandText = "DELETE FROM events; DELETE FROM installation_sessions; DELETE FROM rules; VACUUM;";
+            await command.ExecuteNonQueryAsync();
+        }
+        finally { _gate.Release(); }
+    }
+
+    public async Task<StorageInfo> GetStorageInfoAsync()
+    {
+        await using var connection = new SqliteConnection(ConnectionString);
+        await connection.OpenAsync();
+        static async Task<long> CountAsync(SqliteConnection connection, string table)
+        {
+            var command = connection.CreateCommand();
+            command.CommandText = $"SELECT COUNT(*) FROM {table}";
+            return Convert.ToInt64(await command.ExecuteScalarAsync());
+        }
+        var size = File.Exists(paths.DatabasePath) ? new FileInfo(paths.DatabasePath).Length : 0;
+        return new StorageInfo(paths.DatabasePath, size, await CountAsync(connection, "events"), await CountAsync(connection, "installation_sessions"), await CountAsync(connection, "rules"));
+    }
+
     public async Task ApplyRetentionAsync(int days)
     {
         if (days <= 0) return;

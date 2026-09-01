@@ -1,4 +1,5 @@
-const { app, BrowserWindow, globalShortcut, ipcMain, Menu, nativeImage, nativeTheme, Notification, Tray } = require('electron');
+const { app, BrowserWindow, dialog, globalShortcut, ipcMain, Menu, nativeImage, nativeTheme, Notification, screen, systemPreferences, Tray } = require('electron');
+const fs = require('node:fs');
 const path = require('node:path');
 const { pathToFileURL } = require('node:url');
 const { CoreClient } = require('./core-client.cjs');
@@ -8,9 +9,46 @@ const windows = new Map();
 let core;
 let quitting = false;
 let tray;
+let windowState = {};
+const stateTimers = new Map();
+const collapseTimers = new Map();
 let runtimeSettings = { closeBehavior: 'tray', launchAtSignIn: false, startMinimized: false, startSurface: 'console', floatingWidgetEnabled: true, alwaysOnTop: true, clickThrough: false };
 const severityRank = { informational: 0, normal: 1, important: 2, critical: 3 };
 const notificationThreshold = { all: 0, important: 2, critical: 3, off: 99 };
+const eventPages = { startup: 'startup', service: 'services', browser: 'browser', network: 'network', update: 'update', file: 'files', registry: 'registry', process: 'processes' };
+
+function notificationEnabled(event) {
+  if ((severityRank[event.severity] ?? 0) < (notificationThreshold[runtimeSettings.notificationLevel] ?? 2)) return false;
+  if (event.action === 'INSTALLER_COMPLETE') return runtimeSettings.notifyInstallerComplete !== false;
+  if (event.action === 'AUTO_RESTART_BLOCKED') return runtimeSettings.notifyBlockedRestart !== false;
+  if (event.category === 'startup') return runtimeSettings.notifyStartup !== false;
+  if (event.category === 'service') return runtimeSettings.notifyService !== false;
+  if (event.category === 'browser') return runtimeSettings.notifyBrowser !== false;
+  if (event.category === 'update') return runtimeSettings.notifyWindowsUpdate === true;
+  if (event.category === 'file' && event.severity === 'important') return runtimeSettings.notifyUserFiles !== false;
+  return runtimeSettings.notifySystemChange !== false && (event.severity === 'important' || event.severity === 'critical');
+}
+
+function statePath() { return path.join(app.getPath('userData'), 'window-state.json'); }
+function loadWindowState() { try { windowState = JSON.parse(fs.readFileSync(statePath(), 'utf8')); } catch { windowState = {}; } }
+function saveWindowState() {
+  try { const target = statePath(); const temporary = `${target}.tmp`; fs.writeFileSync(temporary, JSON.stringify(windowState)); fs.renameSync(temporary, target); } catch { }
+}
+function rememberedBounds(surface, fallback) {
+  const saved = windowState[surface];
+  const floating = surface === 'widget' || surface === 'bubble';
+  if (!saved || (floating && !runtimeSettings.rememberWidgetPosition) || (!floating && !runtimeSettings.rememberWindowPosition && !runtimeSettings.rememberWindowSize)) return fallback;
+  const visible = screen.getAllDisplays().some((display) => {
+    const area = display.workArea;
+    return saved.x < area.x + area.width && saved.x + saved.width > area.x && saved.y < area.y + area.height && saved.y + saved.height > area.y;
+  });
+  if (!visible) return fallback;
+  return {
+    ...fallback,
+    ...(runtimeSettings.rememberWindowPosition || (floating && runtimeSettings.rememberWidgetPosition) ? { x: saved.x, y: saved.y } : {}),
+    ...(runtimeSettings.rememberWindowSize && !floating ? { width: saved.width, height: saved.height } : {}),
+  };
+}
 
 const rendererUrl = (surface) => {
   const query = surface === 'main' ? '' : `?surface=${surface}`;
@@ -45,17 +83,49 @@ function createWindow(surface = 'main') {
     terminal: { width: 860, height: 540, minWidth: 680, minHeight: 420, backgroundMaterial: 'acrylic', alwaysOnTop: false, resizable: true },
     widget: { width: 278, height: 440, backgroundColor: '#00000000', transparent: true, backgroundMaterial: 'acrylic', alwaysOnTop: true, skipTaskbar: true, resizable: false },
     bubble: { width: 112, height: 112, backgroundColor: '#00000000', transparent: true, alwaysOnTop: true, skipTaskbar: true, resizable: false },
+    preview: { width: 230, height: 168, backgroundColor: '#00000000', transparent: true, alwaysOnTop: true, skipTaskbar: true, focusable: false, resizable: false },
   };
-  const window = new BrowserWindow({ ...commonOptions, ...surfaceOptions[surface] });
+  const window = new BrowserWindow({ ...commonOptions, ...rememberedBounds(surface, surfaceOptions[surface]) });
   windows.set(surface, window);
   window.loadURL(rendererUrl(surface));
+  if (surface === 'preview') window.setIgnoreMouseEvents(true);
   window.once('ready-to-show', () => window.show());
+  const remember = () => {
+    if (surface === 'preview') return;
+    clearTimeout(stateTimers.get(surface));
+    stateTimers.set(surface, setTimeout(() => { windowState[surface] = window.getBounds(); saveWindowState(); }, 250));
+  };
+  window.on('move', remember);
+  window.on('resize', remember);
+  if (surface === 'widget' || surface === 'bubble') {
+    let snapping = false;
+    window.on('moved', () => {
+      if (!runtimeSettings.edgeSnap || snapping) return;
+      const bounds = window.getBounds();
+      const area = screen.getDisplayMatching(bounds).workArea;
+      const distances = [{ x: area.x, d: Math.abs(bounds.x-area.x) }, { x: area.x+area.width-bounds.width, d: Math.abs(bounds.x-(area.x+area.width-bounds.width)) }];
+      const closest = distances.sort((a,b)=>a.d-b.d)[0];
+      if (closest.d <= 28) { snapping = true; window.setPosition(closest.x, Math.max(area.y, Math.min(bounds.y, area.y+area.height-bounds.height))); snapping = false; }
+    });
+    if (surface === 'widget') {
+    const resetCollapse = () => {
+      clearTimeout(collapseTimers.get(surface));
+      if (runtimeSettings.autoCollapse) collapseTimers.set(surface, setTimeout(() => { window.hide(); createWindow('bubble'); }, 15_000));
+    };
+    window.on('focus', resetCollapse); window.on('blur', resetCollapse); window.webContents.on('before-input-event', resetCollapse); resetCollapse();
+    }
+  }
+  if (surface === 'preview') {
+    const bubble = windows.get('bubble');
+    if (bubble && !bubble.isDestroyed()) { const bounds = bubble.getBounds(); window.setPosition(Math.max(0, bounds.x - 236), bounds.y - 20); }
+  }
   window.on('close', (event) => {
     if (!quitting && (surface === 'main' || surface === 'terminal')) {
       event.preventDefault();
       window.hide();
       if (surface === 'main' && runtimeSettings.closeBehavior === 'bubble') createWindow('bubble');
       if (surface === 'main' && runtimeSettings.closeBehavior === 'exit') { quitting = true; app.quit(); }
+      else if (surface === 'main' && !runtimeSettings.keepMonitoringOnClose) void core.request('pauseMonitoring');
     }
   });
   window.on('closed', () => windows.delete(surface));
@@ -103,17 +173,38 @@ function createTray() {
   tray.on('double-click', () => createWindow('main'));
 }
 
+function applyWindowSettings() {
+  nativeTheme.themeSource = runtimeSettings.theme === 'light' || runtimeSettings.theme === 'dark' ? runtimeSettings.theme : 'system';
+  const material = runtimeSettings.visualStyle === 'solid' ? 'none' : runtimeSettings.visualStyle === 'mica' ? 'mica' : 'acrylic';
+  for (const [surface, window] of windows) {
+    if (window.isDestroyed()) continue;
+    if (surface !== 'bubble' && surface !== 'preview') { try { window.setBackgroundMaterial(material); } catch { } }
+    if (surface === 'widget') {
+      window.setAlwaysOnTop(Boolean(runtimeSettings.alwaysOnTop));
+      window.setIgnoreMouseEvents(Boolean(runtimeSettings.clickThrough), { forward: true });
+      const sizes = { compact: [252, 398], standard: [278, 440], large: [306, 480] };
+      const [width, height] = sizes[runtimeSettings.widgetSize] ?? sizes.standard;
+      window.setSize(width, height);
+    }
+    if (surface === 'bubble') {
+      const size = { small: 92, medium: 112, large: 132 }[runtimeSettings.bubbleSize] ?? 112;
+      window.setSize(size, size);
+    }
+  }
+}
+
 app.whenReady().then(() => {
+  loadWindowState();
   nativeTheme.themeSource = 'dark';
   core = new CoreClient({ app, isDev });
   core.start();
   createTray();
   core.on('traceEvent', (event) => {
     for (const window of windows.values()) if (!window.isDestroyed()) window.webContents.send('trace:event', event);
-    if (event.action === 'INSTALLER_COMPLETE' && Notification.isSupported() && (severityRank[event.severity] ?? 0) >= (notificationThreshold[runtimeSettings.notificationLevel] ?? 2)) {
+    if (Notification.isSupported() && notificationEnabled(event)) {
       const isZh = app.getLocale().toLowerCase().startsWith('zh');
       const notification = new Notification({ title: isZh ? event.easyMessageZh : event.easyMessage, body: event.detail, silent: !runtimeSettings.notificationSound });
-      notification.on('click', () => openMainPage('applications'));
+      notification.on('click', () => openMainPage(event.action === 'INSTALLER_COMPLETE' ? 'applications' : (eventPages[event.category] ?? 'dashboard')));
       notification.show();
     }
   });
@@ -121,8 +212,9 @@ app.whenReady().then(() => {
     runtimeSettings = { ...runtimeSettings, ...settings };
     app.setLoginItemSettings({ openAtLogin: Boolean(settings.launchAtSignIn), args: settings.startMinimized ? ['--start-minimized'] : [] });
     if (!settings.startMinimized && settings.startSurface === 'console') createWindow('main');
-    if (settings.floatingWidgetEnabled && settings.startSurface !== 'bubble') createWindow('widget');
-    if (settings.startSurface === 'bubble') createWindow('bubble');
+    else if (settings.floatingWidgetEnabled && settings.startSurface === 'widget') createWindow('widget');
+    else if (settings.startSurface === 'bubble') createWindow('bubble');
+    applyWindowSettings();
   }).catch(() => { createWindow('main'); createWindow('widget'); });
   globalShortcut.register('CommandOrControl+Shift+T', () => {
     const widget = windows.get('widget');
@@ -141,11 +233,34 @@ ipcMain.handle('core:request', async (_event, method, params) => {
       activeWidget.setAlwaysOnTop(Boolean(runtimeSettings.alwaysOnTop));
       activeWidget.setIgnoreMouseEvents(Boolean(runtimeSettings.clickThrough), { forward: true });
     } else widget?.hide();
+    applyWindowSettings();
   }
   return result;
 });
 ipcMain.handle('surface:show', (_event, surface) => { createWindow(surface); });
 ipcMain.handle('surface:hide', (_event, surface) => { windows.get(surface)?.hide(); });
+ipcMain.handle('system:accent', () => `#${systemPreferences.getAccentColor().slice(0, 6)}`);
+ipcMain.handle('settings:export', async () => {
+  try {
+    const settings = await core.request('getSettings');
+    const result = await dialog.showSaveDialog({ title: 'Export TraceGuard Settings', defaultPath: 'TraceGuard-settings.json', filters: [{ name: 'JSON', extensions: ['json'] }] });
+    if (result.canceled || !result.filePath) return { success: false, message: 'Export cancelled.', messageZh: '已取消导出。' };
+    fs.writeFileSync(result.filePath, JSON.stringify(settings, null, 2), 'utf8');
+    return { success: true, message: 'Settings exported.', messageZh: '设置已导出。' };
+  } catch (error) { return { success: false, message: String(error), messageZh: '导出设置失败。' }; }
+});
+ipcMain.handle('settings:import', async () => {
+  try {
+    const result = await dialog.showOpenDialog({ title: 'Import TraceGuard Settings', properties: ['openFile'], filters: [{ name: 'JSON', extensions: ['json'] }] });
+    if (result.canceled || !result.filePaths[0]) return { success: false, message: 'Import cancelled.', messageZh: '已取消导入。' };
+    const parsed = JSON.parse(fs.readFileSync(result.filePaths[0], 'utf8'));
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw new Error('Invalid settings file.');
+    const current = await core.request('getSettings');
+    const settings = await core.request('updateSettings', { settings: { ...current, ...parsed } });
+    runtimeSettings = { ...runtimeSettings, ...settings };
+    return { success: true, message: 'Settings imported.', messageZh: '设置已导入。', settings };
+  } catch (error) { return { success: false, message: String(error), messageZh: '导入设置失败，已保留原设置。' }; }
+});
 ipcMain.handle('window:action', (event, action) => {
   const window = BrowserWindow.fromWebContents(event.sender);
   if (!window) return;

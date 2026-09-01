@@ -11,6 +11,11 @@ namespace TraceGuard.Core.Platform;
 
 public static class WindowsCollectors
 {
+    private const string DisabledStartupPath = @"Software\TraceGuard\DisabledStartup";
+    private static readonly object ScheduledTaskGate = new();
+    private static IReadOnlyList<StartupRow> _scheduledTasks = [];
+    private static DateTimeOffset _scheduledTasksAt = DateTimeOffset.MinValue;
+
     public static IReadOnlyList<ProcessRow> Processes()
     {
         var rows = new List<ProcessRow>();
@@ -65,7 +70,36 @@ public static class WindowsCollectors
         {
             foreach (var file in Directory.EnumerateFiles(folder)) rows.Add(new StartupRow(Path.GetFileNameWithoutExtension(file), file, "startup-folder", true, "controllable"));
         }
+        ReadScheduledTasks(rows);
         return rows;
+    }
+
+    public static IReadOnlyList<RestoreItem> RestoreItems()
+    {
+        var rows = new List<RestoreItem>();
+        try
+        {
+            using var root = Registry.CurrentUser.OpenSubKey(DisabledStartupPath, writable: false);
+            if (root is null) return rows;
+            foreach (var id in root.GetSubKeyNames())
+            {
+                using var item = root.OpenSubKey(id, writable: false);
+                if (item is null) continue;
+                var name = Convert.ToString(item.GetValue("Name")) ?? string.Empty;
+                var source = Convert.ToString(item.GetValue("Source")) ?? string.Empty;
+                var command = Convert.ToString(item.GetValue("Command")) ?? string.Empty;
+                var disabled = DateTimeOffset.TryParse(Convert.ToString(item.GetValue("DisabledAt")), out var timestamp) ? timestamp : DateTimeOffset.MinValue;
+                if (!string.IsNullOrWhiteSpace(name)) rows.Add(new RestoreItem(id, name, source, command, disabled, "controllable"));
+            }
+            foreach (var legacyName in root.GetValueNames())
+            {
+                var split = legacyName.Split('|', 2);
+                if (split.Length != 2) continue;
+                rows.Add(new RestoreItem($"legacy:{legacyName}", split[1], split[0], Convert.ToString(root.GetValue(legacyName)) ?? string.Empty, DateTimeOffset.MinValue, "controllable"));
+            }
+        }
+        catch (UnauthorizedAccessException) { }
+        return rows.OrderByDescending(item => item.DisabledAt).ToArray();
     }
 
     public static ActionResult StopProcess(int pid)
@@ -106,8 +140,13 @@ public static class WindowsCollectors
                 using var sourceKey = Registry.CurrentUser.OpenSubKey(sourcePath, writable: true);
                 var value = sourceKey?.GetValue(name, null, RegistryValueOptions.DoNotExpandEnvironmentNames);
                 if (value is null) return new(false, "Startup item was not found.", "未找到该启动项。");
-                using var backup = Registry.CurrentUser.CreateSubKey(@"Software\TraceGuard\DisabledStartup", writable: true);
-                backup.SetValue($"{source}|{name}", Convert.ToString(value) ?? string.Empty, RegistryValueKind.String);
+                var id = Guid.NewGuid().ToString("N");
+                using var backup = Registry.CurrentUser.CreateSubKey($@"{DisabledStartupPath}\{id}", writable: true);
+                backup.SetValue("Name", name, RegistryValueKind.String);
+                backup.SetValue("Source", source, RegistryValueKind.String);
+                backup.SetValue("Command", Convert.ToString(value) ?? string.Empty, RegistryValueKind.String);
+                backup.SetValue("Kind", (int)(sourceKey.GetValueKind(name)), RegistryValueKind.DWord);
+                backup.SetValue("DisabledAt", DateTimeOffset.UtcNow.ToString("O"), RegistryValueKind.String);
                 sourceKey!.DeleteValue(name, throwOnMissingValue: false);
                 return new(true, "User startup item disabled.", "用户级启动项已禁用。");
             }
@@ -118,13 +157,77 @@ public static class WindowsCollectors
                 if (file is null) return new(false, "Startup item was not found.", "未找到该启动项。");
                 var disabled = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "TraceGuard", "DisabledStartup");
                 Directory.CreateDirectory(disabled);
-                File.Move(file, Path.Combine(disabled, Path.GetFileName(file)), true);
+                var id = Guid.NewGuid().ToString("N");
+                var storedPath = Path.Combine(disabled, id + Path.GetExtension(file));
+                using (var backup = Registry.CurrentUser.CreateSubKey($@"{DisabledStartupPath}\{id}", writable: true))
+                {
+                    backup.SetValue("Name", name, RegistryValueKind.String);
+                    backup.SetValue("Source", source, RegistryValueKind.String);
+                    backup.SetValue("Command", file, RegistryValueKind.String);
+                    backup.SetValue("StoredPath", storedPath, RegistryValueKind.String);
+                    backup.SetValue("DisabledAt", DateTimeOffset.UtcNow.ToString("O"), RegistryValueKind.String);
+                }
+                try { File.Move(file, storedPath, false); }
+                catch
+                {
+                    Registry.CurrentUser.DeleteSubKeyTree($@"{DisabledStartupPath}\{id}", throwOnMissingSubKey: false);
+                    throw;
+                }
                 return new(true, "User startup item disabled.", "用户级启动项已禁用。");
             }
             return new(false, "Observed but cannot be controlled in Zero-Privilege Mode.", "已检测到，但零提权模式下当前用户没有权限控制。");
         }
         catch (UnauthorizedAccessException) { return Elevated(); }
         catch (IOException error) { return new(false, error.Message, "禁用启动项时发生文件错误。"); }
+    }
+
+    public static ActionResult RestoreStartup(string id)
+    {
+        try
+        {
+            if (id.StartsWith("legacy:", StringComparison.Ordinal)) return RestoreLegacy(id[7..]);
+            using var backup = Registry.CurrentUser.OpenSubKey($@"{DisabledStartupPath}\{id}", writable: false);
+            if (backup is null) return new(false, "Restore item was not found.", "未找到恢复项目。");
+            var name = Convert.ToString(backup.GetValue("Name")) ?? string.Empty;
+            var source = Convert.ToString(backup.GetValue("Source")) ?? string.Empty;
+            var command = Convert.ToString(backup.GetValue("Command")) ?? string.Empty;
+            if (source is "run" or "run-once")
+            {
+                var targetPath = source == "run" ? @"Software\Microsoft\Windows\CurrentVersion\Run" : @"Software\Microsoft\Windows\CurrentVersion\RunOnce";
+                using var target = Registry.CurrentUser.CreateSubKey(targetPath, writable: true);
+                if (target.GetValue(name) is not null) return new(false, "A startup item with the same name already exists.", "同名启动项已经存在，未覆盖现有配置。");
+                var kindValue = Convert.ToInt32(backup.GetValue("Kind", (int)RegistryValueKind.String));
+                var kind = Enum.IsDefined(typeof(RegistryValueKind), kindValue) ? (RegistryValueKind)kindValue : RegistryValueKind.String;
+                target.SetValue(name, command, kind);
+            }
+            else if (source == "startup-folder")
+            {
+                var storedPath = Convert.ToString(backup.GetValue("StoredPath"));
+                if (string.IsNullOrWhiteSpace(storedPath) || !File.Exists(storedPath)) return new(false, "Stored startup file is missing.", "用于恢复的启动文件已丢失。");
+                if (File.Exists(command)) return new(false, "A startup file with the same name already exists.", "同名启动文件已经存在，未覆盖现有文件。");
+                Directory.CreateDirectory(Path.GetDirectoryName(command)!);
+                File.Move(storedPath, command, false);
+            }
+            else return new(false, "This item cannot be restored in Zero-Privilege Mode.", "零提权模式下无法恢复此项目。");
+            Registry.CurrentUser.DeleteSubKeyTree($@"{DisabledStartupPath}\{id}", throwOnMissingSubKey: false);
+            return new(true, "User startup item restored.", "用户级启动项已恢复。");
+        }
+        catch (UnauthorizedAccessException) { return Elevated(); }
+        catch (IOException error) { return new(false, error.Message, "恢复启动项时发生文件错误。"); }
+    }
+
+    private static ActionResult RestoreLegacy(string valueName)
+    {
+        using var root = Registry.CurrentUser.OpenSubKey(DisabledStartupPath, writable: true);
+        var command = Convert.ToString(root?.GetValue(valueName));
+        var split = valueName.Split('|', 2);
+        if (root is null || command is null || split.Length != 2 || !(split[0] is "run" or "run-once")) return new(false, "Legacy restore item is invalid.", "旧版恢复项目无效。");
+        var targetPath = split[0] == "run" ? @"Software\Microsoft\Windows\CurrentVersion\Run" : @"Software\Microsoft\Windows\CurrentVersion\RunOnce";
+        using var target = Registry.CurrentUser.CreateSubKey(targetPath, writable: true);
+        if (target.GetValue(split[1]) is not null) return new(false, "A startup item with the same name already exists.", "同名启动项已经存在，未覆盖现有配置。");
+        target.SetValue(split[1], command, RegistryValueKind.String);
+        root.DeleteValue(valueName, throwOnMissingValue: false);
+        return new(true, "User startup item restored.", "用户级启动项已恢复。");
     }
 
     private static void ReadRunKey(List<StartupRow> rows, string path, string source)
@@ -136,6 +239,60 @@ public static class WindowsCollectors
             foreach (var name in key.GetValueNames()) rows.Add(new StartupRow(name, Convert.ToString(key.GetValue(name)) ?? string.Empty, source, true, "controllable"));
         }
         catch (UnauthorizedAccessException) { }
+    }
+
+    private static void ReadScheduledTasks(List<StartupRow> rows)
+    {
+        lock (ScheduledTaskGate)
+        {
+            if (DateTimeOffset.UtcNow - _scheduledTasksAt < TimeSpan.FromSeconds(30)) { rows.AddRange(_scheduledTasks); return; }
+            try
+            {
+                var discovered = new List<StartupRow>();
+                using var process = Process.Start(new ProcessStartInfo("schtasks.exe", "/Query /FO CSV /NH")
+                {
+                    UseShellExecute = false,
+                    CreateNoWindow = true,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true
+                });
+                if (process is null) return;
+                var output = process.StandardOutput.ReadToEnd();
+                if (!process.WaitForExit(4000)) { try { process.Kill(); } catch { } return; }
+                foreach (var line in output.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries))
+                {
+                    var columns = ParseCsvLine(line);
+                    if (columns.Count == 0 || string.IsNullOrWhiteSpace(columns[0])) continue;
+                    var taskName = columns[0];
+                    var protectedTask = taskName.StartsWith(@"\Microsoft\Windows\", StringComparison.OrdinalIgnoreCase);
+                    discovered.Add(new StartupRow(taskName, columns.Count > 1 ? columns[1] : string.Empty, "scheduled-task", true, protectedTask ? "protected" : "observable"));
+                }
+                _scheduledTasks = discovered;
+                _scheduledTasksAt = DateTimeOffset.UtcNow;
+                rows.AddRange(discovered);
+            }
+            catch { }
+        }
+    }
+
+    private static IReadOnlyList<string> ParseCsvLine(string line)
+    {
+        var values = new List<string>();
+        var current = new StringBuilder();
+        var quoted = false;
+        for (var index = 0; index < line.Length; index++)
+        {
+            var character = line[index];
+            if (character == '"')
+            {
+                if (quoted && index + 1 < line.Length && line[index + 1] == '"') { current.Append('"'); index++; }
+                else quoted = !quoted;
+            }
+            else if (character == ',' && !quoted) { values.Add(current.ToString()); current.Clear(); }
+            else current.Append(character);
+        }
+        values.Add(current.ToString());
+        return values;
     }
 
     private static string? ReadServiceImagePath(string name)

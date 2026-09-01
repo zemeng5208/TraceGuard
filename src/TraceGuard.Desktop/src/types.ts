@@ -71,6 +71,15 @@ export interface StartupRow {
   enabled: boolean;
   permission: 'controllable' | 'observable' | 'protected';
 }
+export interface RestoreItem {
+  id: string; name: string; source: StartupRow['source']; originalCommand: string; disabledAt: string; permission: 'controllable' | 'observable' | 'protected';
+}
+export interface ConfigurationItem {
+  id: string; category: string; name: string; value: string; source: string;
+  permission: 'controllable' | 'observable' | 'protected'; description: string; descriptionZh: string;
+  severity: 'informational' | 'normal' | 'important' | 'critical';
+}
+export interface StorageInfo { databasePath: string; databaseBytes: number; eventCount: number; reportCount: number; ruleCount: number; }
 
 export interface RegistryChange {
   hive: string; path: string; valueName: string; changeType: 'created' | 'modified' | 'deleted'; oldValue?: string; newValue?: string; severity: 'normal' | 'important';
@@ -127,14 +136,26 @@ export interface AppSettings {
   bubbleSize: 'small' | 'medium' | 'large';
   bubbleLabel: 'tg' | 'icon';
   showBadgeCount: boolean;
+  showUpdateStatus: boolean;
+  showRecordingStatus: boolean;
   hoverPreview: boolean;
   hoverDelayMs: 0 | 300 | 500 | 800;
+  bubbleSingleClickAction: 'panel' | 'terminal' | 'console';
+  bubbleDoubleClickAction: 'console' | 'terminal';
   terminalMode: 'easy' | 'raw';
   terminalAutoScroll: boolean;
   terminalTimestampMilliseconds: boolean;
   terminalMaxRows: number;
   notificationLevel: 'all' | 'important' | 'critical' | 'off';
   notificationSound: boolean;
+  notifySystemChange: boolean;
+  notifyStartup: boolean;
+  notifyService: boolean;
+  notifyBrowser: boolean;
+  notifyBlockedRestart: boolean;
+  notifyInstallerComplete: boolean;
+  notifyWindowsUpdate: boolean;
+  notifyUserFiles: boolean;
   launchAtSignIn: boolean;
   keepMonitoringOnClose: boolean;
   lowPowerMode: boolean;
@@ -162,20 +183,32 @@ export interface TraceGuardApi {
   getProcesses(): Promise<ProcessRow[]>;
   getServices(): Promise<ServiceRow[]>;
   getStartupItems(): Promise<StartupRow[]>;
+  getRestoreItems(): Promise<RestoreItem[]>;
+  getBrowserItems(): Promise<ConfigurationItem[]>;
+  getNetworkItems(): Promise<ConfigurationItem[]>;
+  getWindowsUpdateItems(): Promise<ConfigurationItem[]>;
+  getFileAssociationItems(): Promise<ConfigurationItem[]>;
   getSessions(limit?: number): Promise<InstallationSession[]>;
+  getStorageInfo(): Promise<StorageInfo>;
   getRules(): Promise<TraceRule[]>;
   saveRule(rule: TraceRule): Promise<TraceRule>;
   deleteRule(id: string): Promise<ActionResult>;
   disableStartup(name: string, source: StartupRow['source']): Promise<ActionResult>;
+  restoreStartup(id: string): Promise<ActionResult>;
   getSettings(): Promise<AppSettings>;
   updateSettings(settings: AppSettings): Promise<AppSettings>;
   pauseMonitoring(): Promise<ActionResult>;
   resumeMonitoring(): Promise<ActionResult>;
   clearEvents(): Promise<ActionResult>;
+  clearReports(): Promise<ActionResult>;
+  resetDatabase(): Promise<ActionResult>;
+  getSystemAccent(): Promise<string>;
+  exportSettings(): Promise<ActionResult>;
+  importSettings(): Promise<ActionResult & { settings?: AppSettings }>;
   stopProcess(pid: number): Promise<ActionResult>;
   stopService(name: string): Promise<ActionResult>;
-  showSurface(surface: 'main' | 'terminal' | 'widget' | 'bubble'): Promise<void>;
-  hideSurface(surface: 'terminal' | 'widget' | 'bubble'): Promise<void>;
+  showSurface(surface: 'main' | 'terminal' | 'widget' | 'bubble' | 'preview'): Promise<void>;
+  hideSurface(surface: 'terminal' | 'widget' | 'bubble' | 'preview'): Promise<void>;
   windowAction(action: 'minimize' | 'maximize' | 'close'): Promise<void>;
   onNavigate(callback: (page: string) => void): () => void;
   onTraceEvent(callback: (event: TraceEvent) => void): () => void;

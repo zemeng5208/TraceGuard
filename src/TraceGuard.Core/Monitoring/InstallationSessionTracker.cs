@@ -15,6 +15,8 @@ public sealed class InstallationSessionTracker(EventStore store, RegistrySnapsho
         public int FilesDeleted;
         public int UserFilesModified;
         public ConcurrentDictionary<int, SessionProcess> Processes { get; } = [];
+        public DateTimeOffset? RootExitedAt;
+        public CancellationTokenSource? CompletionDelay;
     }
 
     private readonly ConcurrentDictionary<int, ActiveState> _active = [];
@@ -49,7 +51,11 @@ public sealed class InstallationSessionTracker(EventStore store, RegistrySnapsho
         if (process.Started)
         {
             var parentState = process.ParentPid is { } parentPid ? _active.Values.FirstOrDefault(state => state.Processes.ContainsKey(parentPid)) : null;
-            if (parentState is not null) AddProcess(parentState, process);
+            if (parentState is not null)
+            {
+                AddProcess(parentState, process);
+                if (parentState.RootExitedAt is not null) ScheduleCompletion(parentState);
+            }
             else if (IsInstaller(process.Name, process.Executable)) Start(process);
             return;
         }
@@ -57,7 +63,11 @@ public sealed class InstallationSessionTracker(EventStore store, RegistrySnapsho
         {
             if (!state.Processes.TryGetValue(process.Pid, out var tracked)) continue;
             state.Processes[process.Pid] = tracked with { EndedAt = process.Timestamp };
-            if (process.Pid == state.Session.RootPid && _active.TryRemove(process.Pid, out var completed)) _ = CompleteAsync(completed, process.Timestamp);
+            if (process.Pid == state.Session.RootPid)
+            {
+                state.RootExitedAt = process.Timestamp;
+                ScheduleCompletion(state);
+            }
             break;
         }
     }
@@ -96,6 +106,25 @@ public sealed class InstallationSessionTracker(EventStore store, RegistrySnapsho
         var completed = state.Session with { EndedAt = endedAt, Status = "completed", ChangeCount = count, ImportantCount = important, Summary = summary, RegistryChanges = changes, Processes = state.Processes.Values.OrderBy(process => process.StartedAt).ToArray() };
         await store.SaveSessionAsync(completed);
         publish(new TraceEvent(0, endedAt, "process", "INSTALLER_COMPLETE", "Installation monitoring completed", "安装监控已完成", $"{completed.RootProcess} · {count} changes · {important} important", completed.RootProcess, completed.RootPid, important > 0 ? "important" : "normal"));
+    }
+
+    private void ScheduleCompletion(ActiveState state)
+    {
+        state.CompletionDelay?.Cancel();
+        state.CompletionDelay?.Dispose();
+        var cancellation = new CancellationTokenSource();
+        state.CompletionDelay = cancellation;
+        _ = CompleteAfterGraceAsync(state, cancellation.Token);
+    }
+
+    private async Task CompleteAfterGraceAsync(ActiveState state, CancellationToken cancellationToken)
+    {
+        try { await Task.Delay(TimeSpan.FromSeconds(8), cancellationToken); }
+        catch (OperationCanceledException) { return; }
+        if (!_active.TryGetValue(state.Session.RootPid, out var current) || !ReferenceEquals(current, state) || !_active.TryRemove(state.Session.RootPid, out _)) return;
+        state.CompletionDelay?.Dispose();
+        state.CompletionDelay = null;
+        await CompleteAsync(state, DateTimeOffset.UtcNow);
     }
 
     private static bool IsInstaller(string name, string? executable)
