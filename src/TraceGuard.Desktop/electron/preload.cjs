@@ -19,6 +19,11 @@ contextBridge.exposeInMainWorld('traceGuard', {
   showSurface: (surface) => ipcRenderer.invoke('surface:show', surface),
   hideSurface: (surface) => ipcRenderer.invoke('surface:hide', surface),
   windowAction: (action) => ipcRenderer.invoke('window:action', action),
+  onNavigate: (callback) => {
+    const listener = (_event, page) => callback(page);
+    ipcRenderer.on('navigate', listener);
+    return () => ipcRenderer.removeListener('navigate', listener);
+  },
   onTraceEvent: (callback) => {
     const listener = (_event, traceEvent) => callback(traceEvent);
     ipcRenderer.on('trace:event', listener);

@@ -1,13 +1,14 @@
 import { Activity, Check, CircleGauge, FileClock, HardDrive, Network, X } from 'lucide-react';
 import { EventTerminal } from '@/components/EventTerminal';
 import { traceGuardApi } from '@/bridge';
+import { isChinese } from '@/i18n';
 import type { AppSettings, Overview, TraceEvent } from '@/types';
 
 const api = traceGuardApi();
 const bytes = (value = 0) => value >= 1024 * 1024 ? `${(value / 1024 / 1024).toFixed(1)} MB/s` : `${Math.round(value / 1024)} KB/s`;
 
 export function WidgetSurface({ overview, settings }: { overview: Overview | null; events: TraceEvent[]; settings: AppSettings }) {
-  const isZh = settings.locale === 'zh-CN';
+  const isZh = isChinese(settings.locale);
   const rows = [
     [FileClock, isZh ? '文件变化' : 'Files', '+38 /min', 'blue'],
     [Activity, isZh ? '注册表变化' : 'Registry', '+7 /min', 'purple'],
@@ -35,6 +36,6 @@ export function TerminalSurface({ events, settings }: { events: TraceEvent[]; se
 }
 
 export function InstallationToast({ settings }: { settings: AppSettings }) {
-  const isZh = settings.locale === 'zh-CN';
+  const isZh = isChinese(settings.locale);
   return <section className="install-toast glass-window"><span className="complete-icon"><Check size={19} /></span><div><strong>{isZh ? '安装完成' : 'Installation Completed'}</strong><small>ABC Player</small><p>{isZh ? '共检测到 428 个系统变化' : '428 system changes'}<br /><b>{isZh ? '3 个重要变化' : '3 important changes'}</b></p><button type="button">{isZh ? '查看报告' : 'View Report'}</button></div></section>;
 }

@@ -44,6 +44,10 @@
 }
 
 :root[data-density='compact'] { font-size: 13px; }
+:root[data-font-size='small'] { font-size: 13px; }
+:root[data-font-size='large'] { font-size: 15px; }
+:root[data-corner-radius='standard'] { --radius: 11px; --radius-lg: 15px; }
+:root[data-corner-radius='more-rounded'] { --radius: 18px; --radius-lg: 24px; }
 :root[data-animation='reduced'] * { animation-duration: .01ms !important; transition-duration: .12s !important; }
 :root[data-animation='off'] * { animation: none !important; transition: none !important; }
 

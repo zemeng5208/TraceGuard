@@ -156,6 +156,7 @@ export interface TraceGuardApi {
   showSurface(surface: 'main' | 'terminal' | 'widget' | 'bubble'): Promise<void>;
   hideSurface(surface: 'terminal' | 'widget' | 'bubble'): Promise<void>;
   windowAction(action: 'minimize' | 'maximize' | 'close'): Promise<void>;
+  onNavigate(callback: (page: string) => void): () => void;
   onTraceEvent(callback: (event: TraceEvent) => void): () => void;
 }
 

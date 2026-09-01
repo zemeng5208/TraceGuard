@@ -45,6 +45,7 @@ const previewApi: TraceGuardApi = {
   windowAction: async (action) => {
     if (action === 'close') window.close();
   },
+  onNavigate: () => () => undefined,
   onTraceEvent: () => () => undefined,
 };
 

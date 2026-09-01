@@ -66,12 +66,28 @@ export function App() {
   }, []);
 
   useEffect(() => {
-    document.documentElement.dataset.theme = settings.theme;
+    const applyTheme = () => {
+      document.documentElement.dataset.theme = settings.theme === 'system'
+        ? (window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark')
+        : settings.theme;
+    };
+    applyTheme();
     document.documentElement.dataset.density = settings.density;
     document.documentElement.dataset.animation = settings.animation;
+    document.documentElement.dataset.fontSize = settings.fontSize;
+    document.documentElement.dataset.cornerRadius = settings.cornerRadius;
     document.documentElement.style.setProperty('--accent', settings.accentColor);
     document.documentElement.style.setProperty('--window-opacity', String(Math.max(0.7, 1 - settings.transparency / 100)));
+    const media = window.matchMedia('(prefers-color-scheme: light)');
+    if (settings.theme === 'system') media.addEventListener('change', applyTheme);
+    return () => media.removeEventListener('change', applyTheme);
   }, [settings]);
+
+  useEffect(() => api.onNavigate((nextPage) => {
+    if (['dashboard', 'terminal', 'processes', 'services', 'disk', 'network', 'update', 'files', 'registry', 'startup', 'browser', 'rules', 'restore', 'settings'].includes(nextPage)) {
+      setPage(nextPage as PageId);
+    }
+  }), []);
 
   if (surface === 'widget') return <WidgetSurface overview={overview} events={events} settings={settings} />;
   if (surface === 'bubble') return <BubbleSurface overview={overview} events={events} settings={settings} />;
@@ -100,4 +116,3 @@ export function App() {
     </div>
   );
 }
-

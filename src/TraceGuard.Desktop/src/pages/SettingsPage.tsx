@@ -4,7 +4,7 @@ import {
   Sparkles, TerminalSquare, PanelsTopLeft,
 } from 'lucide-react';
 import { useDeferredValue, useMemo, useState, type CSSProperties, type ReactNode } from 'react';
-import { secondaryText, text } from '@/i18n';
+import { isChinese, secondaryText, text } from '@/i18n';
 import type { AppSettings } from '@/types';
 
 type SectionId = 'general' | 'appearance' | 'language' | 'monitoring' | 'floatingWindow' | 'floatingBubble' | 'liveTerminal' | 'notifications' | 'startupBackground' | 'privacy' | 'storage' | 'protection' | 'advanced' | 'about';
@@ -26,7 +26,7 @@ const sections: Array<{ id: SectionId; key: string; icon: typeof Settings2; sear
   { id: 'about', key: 'about', icon: CircleHelp, search: 'about version license privacy 关于 版本' },
 ];
 
-const zh = (settings: AppSettings) => settings.locale === 'zh-CN';
+const zh = (settings: AppSettings) => isChinese(settings.locale);
 
 function SettingCard({ title, subtitle, children, className = '' }: { title: string; subtitle?: string; children: ReactNode; className?: string }) {
   return <section className={`setting-card ${className}`}><header><div><h3>{title}</h3>{subtitle ? <p>{subtitle}</p> : null}</div></header>{children}</section>;

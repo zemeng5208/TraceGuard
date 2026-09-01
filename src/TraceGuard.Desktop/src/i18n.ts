@@ -75,6 +75,8 @@ export const resolvedLocale = (locale: Locale): 'en-US' | 'zh-CN' => {
   return navigator.language.toLowerCase().startsWith('zh') ? 'zh-CN' : 'en-US';
 };
 
+export const isChinese = (locale: Locale): boolean => resolvedLocale(locale) === 'zh-CN';
+
 export const text = (key: string, locale: Locale): string => {
   const item = copy[key];
   if (!item) return key;

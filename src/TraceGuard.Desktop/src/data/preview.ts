@@ -2,7 +2,7 @@ import type { AppSettings, Overview, ProcessRow, ServiceRow, StartupRow, TraceEv
 
 export const defaultSettings: AppSettings = {
   schemaVersion: 1,
-  locale: 'zh-CN',
+  locale: 'auto',
   theme: 'dark',
   visualStyle: 'acrylic',
   accentColor: '#4c97ff',

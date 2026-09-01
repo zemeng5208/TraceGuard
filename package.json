@@ -2,6 +2,7 @@
   "name": "traceguard",
   "version": "0.1.0",
   "private": true,
+  "type": "module",
   "description": "Zero-privilege Windows behavior transparency and monitoring tool.",
   "main": "src/TraceGuard.Desktop/electron/main.cjs",
   "scripts": {
@@ -65,4 +66,3 @@
     }
   }
 }
-

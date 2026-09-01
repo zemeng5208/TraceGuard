@@ -1,5 +1,5 @@
 import { ChevronRight, Disc3, ShieldAlert } from 'lucide-react';
-import { secondaryText, text } from '@/i18n';
+import { isChinese, secondaryText, text } from '@/i18n';
 import type { AppSettings, Overview, TraceEvent } from '@/types';
 
 export function MetricCard({
@@ -71,10 +71,10 @@ export function InstallerPanel({ overview, settings }: { overview: Overview | nu
       {installer ? (
         <>
           <div className="installer-file"><span className="installer-icon"><Disc3 size={17} /></span><div><strong>{installer.name}</strong><small>PID: {installer.pid}</small></div><em>REC</em></div>
-          <dl className="installer-stats"><div><dt>{settings.locale === 'zh-CN' ? '监控时长' : 'Elapsed'}</dt><dd>{elapsed}</dd></div><div><dt>{settings.locale === 'zh-CN' ? '检测到变化' : 'Changes'}</dt><dd>{installer.changeCount}</dd></div></dl>
+          <dl className="installer-stats"><div><dt>{isChinese(settings.locale) ? '监控时长' : 'Elapsed'}</dt><dd>{elapsed}</dd></div><div><dt>{isChinese(settings.locale) ? '检测到变化' : 'Changes'}</dt><dd>{installer.changeCount}</dd></div></dl>
           <button type="button" className="primary-button">{text('viewReport', settings.locale)} <span>{secondaryText('viewReport', settings.locale)}</span></button>
         </>
-      ) : <div className="empty-state">{settings.locale === 'zh-CN' ? '未检测到活动安装程序' : 'No active installer detected'}</div>}
+      ) : <div className="empty-state">{isChinese(settings.locale) ? '未检测到活动安装程序' : 'No active installer detected'}</div>}
     </section>
   );
 }
@@ -88,13 +88,13 @@ export function EventFeed({ events, settings, limit = 5 }: { events: TraceEvent[
           <div className="event-row" key={event.id}>
             <span className={`event-dot severity-${event.severity}`} />
             <time>{new Date(event.timestamp).toLocaleTimeString([], { hour12: false })}</time>
-            <div><strong>{settings.locale === 'zh-CN' ? event.easyMessageZh : event.easyMessage}</strong><small>{settings.locale === 'zh-CN' ? event.easyMessage : event.easyMessageZh}</small></div>
+            <div><strong>{isChinese(settings.locale) ? event.easyMessageZh : event.easyMessage}</strong><small>{isChinese(settings.locale) ? event.easyMessage : event.easyMessageZh}</small></div>
             <span className="event-process">{event.processName ?? 'Windows'}</span>
             <ChevronRight size={15} />
           </div>
         ))}
       </div>
-      <button className="text-button" type="button">{settings.locale === 'zh-CN' ? '查看更多' : 'View all'} <span>{settings.locale === 'zh-CN' ? 'View All' : '查看更多'}</span></button>
+      <button className="text-button" type="button">{isChinese(settings.locale) ? '查看更多' : 'View all'} <span>{isChinese(settings.locale) ? 'View All' : '查看更多'}</span></button>
     </section>
   );
 }
@@ -114,12 +114,11 @@ export function ResourcePanel({ overview, settings }: { overview: Overview | nul
       <header className="panel-title-row"><div><h2>{text('systemResources', settings.locale)}</h2><span>{secondaryText('systemResources', settings.locale)}</span></div></header>
       <div className="gauge-grid">
         <ResourceGauge value={overview?.cpuPercent ?? 0} label="CPU" color="#4f9cff" />
-        <ResourceGauge value={overview?.memoryPercent ?? 0} label={settings.locale === 'zh-CN' ? '内存' : 'RAM'} color="#62d797" />
-        <ResourceGauge value={32} label={settings.locale === 'zh-CN' ? '磁盘' : 'Disk'} color="#4f9cff" />
-        <ResourceGauge value={18} label={settings.locale === 'zh-CN' ? '网络' : 'Network'} color="#62d797" />
+        <ResourceGauge value={overview?.memoryPercent ?? 0} label={isChinese(settings.locale) ? '内存' : 'RAM'} color="#62d797" />
+        <ResourceGauge value={32} label={isChinese(settings.locale) ? '磁盘' : 'Disk'} color="#4f9cff" />
+        <ResourceGauge value={18} label={isChinese(settings.locale) ? '网络' : 'Network'} color="#62d797" />
       </div>
-      <div className="resource-note"><ShieldAlert size={15} /><span>{settings.locale === 'zh-CN' ? '仅显示当前用户可观察的数据' : 'Shows data observable by the current user only'}</span></div>
+      <div className="resource-note"><ShieldAlert size={15} /><span>{isChinese(settings.locale) ? '仅显示当前用户可观察的数据' : 'Shows data observable by the current user only'}</span></div>
     </section>
   );
 }
-

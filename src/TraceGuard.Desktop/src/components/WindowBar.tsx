@@ -1,6 +1,6 @@
 import { ChevronDown, Maximize2, Minus, Moon, PanelTop, Sun, X } from 'lucide-react';
 import { traceGuardApi } from '@/bridge';
-import { secondaryText, text } from '@/i18n';
+import { isChinese, secondaryText, text } from '@/i18n';
 import type { AppSettings } from '@/types';
 import type { PageId } from '@/components/Sidebar';
 
@@ -38,10 +38,10 @@ export function WindowBar({ page, settings, onSettings }: WindowBarProps) {
         <button
           className="select-like"
           type="button"
-          onClick={() => onSettings({ locale: settings.locale === 'zh-CN' ? 'en-US' : 'zh-CN' })}
+          onClick={() => onSettings({ locale: isChinese(settings.locale) ? 'en-US' : 'zh-CN' })}
         >
           <PanelTop size={14} />
-          {settings.locale === 'zh-CN' ? '简体中文' : 'English'}
+          {isChinese(settings.locale) ? '简体中文' : 'English'}
           <ChevronDown size={13} />
         </button>
         <span className="window-control-separator" />
