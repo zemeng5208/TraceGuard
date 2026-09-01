@@ -102,6 +102,7 @@ export const previewOverview: Overview = {
     { id: 'browser', state: 'disabled', message: 'Disabled in Settings.', messageZh: '已在设置中关闭。' },
     { id: 'network', state: 'disabled', message: 'Disabled in Settings.', messageZh: '已在设置中关闭。' },
     { id: 'update', state: 'active', message: 'Windows Update observation is active.', messageZh: 'Windows Update 活动观察正在运行。' },
+    { id: 'usn', state: 'available', message: 'Readable with the current user token on C:. FileSystemWatcher remains active until journal event attribution is enabled.', messageZh: '当前用户令牌可读取 C:。在 USN 事件归属功能启用前仍继续使用 FileSystemWatcher。' },
   ],
   activeInstaller: { name: 'ABC_Setup.exe', pid: 4528, elapsedSeconds: 204, changeCount: 428 },
 };

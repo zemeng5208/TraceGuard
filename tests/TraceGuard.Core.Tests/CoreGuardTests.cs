@@ -1,4 +1,5 @@
 using TraceGuard.Core.Protection;
+using Xunit;
 
 namespace TraceGuard.Core.Tests;
 

@@ -176,7 +176,8 @@ public sealed class CoreHost : IDisposable
                 Status("startup", _settings.StartupMonitoring, configurationRunning, $"User startup comparison every {_configurations.PollIntervalMs / 1000}s.", $"每 {_configurations.PollIntervalMs / 1000} 秒比较用户启动项。"),
                 Status("browser", _settings.BrowserMonitoring, configurationRunning, "Browser configuration monitoring is active.", "浏览器配置监控正在运行。"),
                 Status("network", _settings.NetworkMonitoring, configurationRunning, "Network configuration monitoring is active.", "网络配置监控正在运行。"),
-                Status("update", _settings.UpdateMonitoring, configurationRunning, "Windows Update observation is active.", "Windows Update 活动观察正在运行。")
+                Status("update", _settings.UpdateMonitoring, configurationRunning, "Windows Update observation is active.", "Windows Update 活动观察正在运行。"),
+                UsnJournalProbe.GetStatus()
             ];
         }
     }

@@ -289,6 +289,7 @@ td strong, td small { display: block; overflow: hidden; text-overflow: ellipsis;
 .monitoring-banner small { margin-top: 2px; color: var(--dim); font-size: .55rem; }
 .monitor-control { display: flex; align-items: center; gap: 9px; }
 .module-status { margin: 0 !important; padding: 4px 8px; border: 1px solid rgba(99,214,150,.16); border-radius: 999px; color: var(--green) !important; background: rgba(49,129,87,.08); white-space: nowrap; font-size: .54rem !important; }
+.module-status.status-available { color: var(--blue) !important; border-color: rgba(var(--accent-rgb),.2); background: rgba(var(--accent-rgb),.08); }
 .module-status.status-reduced { color: #f0c674 !important; border-color: rgba(240,198,116,.2); background: rgba(151,112,41,.08); }
 .module-status.status-paused, .module-status.status-disabled, .module-status.status-checking { color: var(--muted) !important; border-color: var(--line); background: rgba(91,113,129,.06); }
 .module-status.status-unavailable { color: #f0a766 !important; border-color: rgba(240,167,102,.18); background: rgba(150,81,35,.08); }

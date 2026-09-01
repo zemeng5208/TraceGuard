@@ -18,7 +18,9 @@ The rule engine stores current-user process rules in SQLite. Block Auto-Restart 
 
 Phase 1 file monitoring uses `FileSystemWatcher` over user folders, or accessible fixed volumes when the user opts into full-disk monitoring. It records metadata only. The USN Journal and ETW are reserved for Phase 4 and will appear in Settings only after they are genuinely implemented.
 
-The core reports the runtime state of every configured collector as active, reduced, paused, disabled, or unavailable. Battery mode is re-evaluated while the application is running: it reduces full-disk scope to user folders and lowers configuration polling frequency while preserving process observation. Dashboard event rates are queried from SQLite and its activity chart is derived from actual recent events; unreadable elevated-process I/O is never replaced with sample telemetry.
+The core reports the runtime state of every configured collector as active, available, reduced, paused, disabled, or unavailable. Battery mode is re-evaluated while the application is running: it reduces full-disk scope to user folders and lowers configuration polling frequency while preserving process observation. Dashboard event rates are queried from SQLite and its activity chart is derived from actual recent events; unreadable elevated-process I/O is never replaced with sample telemetry.
+
+USN Journal capability probing opens each ready local NTFS volume with zero requested access and calls `FSCTL_QUERY_USN_JOURNAL`. It never creates, deletes, resizes, or otherwise modifies a journal. Results are cached and exposed as capability state; FileSystemWatcher remains the active collector until record reading and safe path attribution are implemented and verified for the current user token.
 
 ## Persistence
 

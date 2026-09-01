@@ -49,7 +49,8 @@
 - [x] Dynamic battery-mode reduction without stopping core process observation
 - [x] Real one-minute event rates and event-derived Dashboard chart
 - [x] Remove hard-coded disk/network percentages and sample telemetry from production UI
-- [ ] Evaluate zero-privilege USN Journal availability and implement a safe fallback boundary
+- [x] Probe zero-privilege USN Journal readability per NTFS volume without creating or modifying journals
+- [ ] Read and attribute USN journal events on volumes where the current user token is sufficient
 - [ ] Evaluate user-session ETW providers without requiring elevation
 - [ ] Complete Windows 10/11 build, installer, and runtime smoke tests
 - [ ] Normalize release version and publish the first verified package
