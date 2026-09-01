@@ -49,6 +49,7 @@ export interface ProcessRow {
   executable?: string;
   cpuPercent: number;
   memoryBytes: number;
+  ioBytesPerSecond: number;
   publisher?: string;
   permission: 'controllable' | 'observable' | 'protected';
 }
@@ -144,8 +145,15 @@ export interface AppSettings {
   bubbleDoubleClickAction: 'console' | 'terminal';
   terminalMode: 'easy' | 'raw';
   terminalAutoScroll: boolean;
+  terminalPauseOnHover: boolean;
   terminalTimestampMilliseconds: boolean;
   terminalMaxRows: number;
+  terminalFontSize: 'small' | 'default' | 'large';
+  terminalShowCategory: boolean;
+  terminalShowProcess: boolean;
+  terminalShowPid: boolean;
+  terminalShowFullPath: boolean;
+  terminalHiddenCategories: EventCategory[];
   notificationLevel: 'all' | 'important' | 'critical' | 'off';
   notificationSound: boolean;
   notifySystemChange: boolean;
@@ -205,6 +213,7 @@ export interface TraceGuardApi {
   getSystemAccent(): Promise<string>;
   exportSettings(): Promise<ActionResult>;
   importSettings(): Promise<ActionResult & { settings?: AppSettings }>;
+  exportReport(session: InstallationSession): Promise<ActionResult>;
   stopProcess(pid: number): Promise<ActionResult>;
   stopService(name: string): Promise<ActionResult>;
   showSurface(surface: 'main' | 'terminal' | 'widget' | 'bubble' | 'preview'): Promise<void>;

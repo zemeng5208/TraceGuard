@@ -19,6 +19,8 @@ public sealed class CoreGuardTests
     [InlineData("RpcSs")]
     [InlineData("DcomLaunch")]
     [InlineData("PlugPlay")]
+    [InlineData("wuauserv")]
+    [InlineData("WinDefend")]
     public void CriticalServicesAreAlwaysProtected(string serviceName) => Assert.True(CoreGuard.IsProtectedService(serviceName));
 
     [Fact]

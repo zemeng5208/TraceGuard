@@ -31,6 +31,7 @@ contextBridge.exposeInMainWorld('traceGuard', {
   getSystemAccent: () => ipcRenderer.invoke('system:accent'),
   exportSettings: () => ipcRenderer.invoke('settings:export'),
   importSettings: () => ipcRenderer.invoke('settings:import'),
+  exportReport: (session) => ipcRenderer.invoke('report:export', session),
   stopProcess: (pid) => request('stopProcess', { pid }),
   stopService: (name) => request('stopService', { name }),
   showSurface: (surface) => ipcRenderer.invoke('surface:show', surface),

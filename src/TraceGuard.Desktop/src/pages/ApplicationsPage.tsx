@@ -1,5 +1,6 @@
-import { AlertTriangle, AppWindow, ChevronRight, Clock3, FilePlus2, FolderSync, GitBranch, RadioTower, ShieldCheck } from 'lucide-react';
+import { AlertTriangle, AppWindow, ChevronRight, Clock3, Download, FilePlus2, FolderSync, GitBranch, RadioTower, ShieldCheck } from 'lucide-react';
 import { useMemo, useState } from 'react';
+import { traceGuardApi } from '@/bridge';
 import { isChinese, secondaryText, text } from '@/i18n';
 import type { AppSettings, ChangeSummary, InstallationSession } from '@/types';
 
@@ -13,6 +14,7 @@ const summaryItems: Array<{ key: keyof ChangeSummary; en: string; zh: string }> 
   { key: 'browserChanges', en: 'Browser changes', zh: '浏览器变化' },
   { key: 'userFilesModified', en: 'User files', zh: '用户文件变化' },
 ];
+const api = traceGuardApi();
 
 const formatDuration = (session: InstallationSession) => {
   const end = session.endedAt ? new Date(session.endedAt).getTime() : Date.now();
@@ -23,7 +25,9 @@ const formatDuration = (session: InstallationSession) => {
 export function ApplicationsPage({ sessions, settings }: { sessions: InstallationSession[]; settings: AppSettings }) {
   const isZh = isChinese(settings.locale);
   const [selectedId, setSelectedId] = useState<string>();
+  const [status, setStatus] = useState('');
   const selected = useMemo(() => sessions.find((session) => session.id === selectedId) ?? sessions[0], [selectedId, sessions]);
+  const reasons = useMemo(() => selected ? riskReasons(selected, isZh) : [], [isZh, selected]);
 
   return (
     <div className="reports-page">
@@ -51,11 +55,13 @@ export function ApplicationsPage({ sessions, settings }: { sessions: Installatio
             <header className="report-hero">
               <div className="report-orb"><FolderSync size={22} /></div>
               <div><span>{isZh ? '应用行为会话' : 'Application behavior session'}</span><h2>{selected.rootProcess}</h2><small><Clock3 size={12} /> {formatDuration(selected)} · {selected.changeCount.toLocaleString()} {isZh ? '项变化' : 'changes'}</small></div>
-              <span className={`risk-pill ${selected.importantCount > 0 ? 'risk-important' : 'risk-normal'}`}>
+              <div className="report-actions"><button className="glass-button" type="button" onClick={()=>void api.exportReport(selected).then(result=>setStatus(isZh?result.messageZh??'':result.message??''))}><Download size={13}/>{isZh?'导出':'Export'}</button><span className={`risk-pill ${selected.importantCount > 0 ? 'risk-important' : 'risk-normal'}`}>
                 {selected.importantCount > 0 ? <AlertTriangle size={13} /> : <ShieldCheck size={13} />}
                 {selected.importantCount} {isZh ? '项重要变化' : 'important'}
-              </span>
+              </span></div>
             </header>
+            {status ? <p className="inline-status">{status}</p> : null}
+            <div className={`risk-explanation ${reasons.length ? 'has-risk' : ''}`}><ShieldCheck size={17}/><div><strong>{reasons.length ? (isZh?'为什么需要注意':'Why this needs attention') : (isZh?'未发现高优先级行为':'No high-priority behavior detected')}</strong><span>{reasons.length ? reasons.join(' · ') : (isZh?'大量普通程序文件本身不会提高风险等级。':'Large numbers of ordinary program files do not raise risk by themselves.')}</span></div></div>
             <div className="change-summary-grid">
               {summaryItems.map((item) => <article key={item.key}><span>{isZh ? item.zh : item.en}</span><strong>{selected.summary[item.key]}</strong></article>)}
             </div>
@@ -75,10 +81,20 @@ export function ApplicationsPage({ sessions, settings }: { sessions: Installatio
               ))}
               {selected.registryChanges.length === 0 ? <div className="report-empty compact"><span>{isZh ? '此会话未检测到所监控范围内的注册表变化。' : 'No registry changes were detected in the monitored scope.'}</span></div> : null}
             </div>
-            <p className="attribution-note"><AlertTriangle size={14} />{isZh ? 'Phase 2 当前使用会话时间窗口关联文件变化；精确的进程级文件归属将在 ETW/USN 阶段增强。' : 'Phase 2 currently associates file changes by session time window. Exact process-level attribution will be strengthened with ETW/USN.'}</p>
+            <p className="attribution-note"><AlertTriangle size={14} />{isZh ? '文件变化按安装会话时间窗口进行最佳努力关联；无法由当前用户可靠读取的进程级来源会明确保持未知。' : 'File changes use best-effort installation time-window attribution; process-level sources that cannot be read reliably remain explicitly unknown.'}</p>
           </>
         ) : <div className="report-empty"><AppWindow size={28} /><strong>{isZh ? '选择一个应用报告' : 'Select an application report'}</strong></div>}
       </section>
     </div>
   );
+}
+
+function riskReasons(session: InstallationSession, zh: boolean): string[] {
+  const reasons: string[] = [];
+  if (session.summary.userFilesModified) reasons.push(zh ? `修改了 ${session.summary.userFilesModified} 个用户文件` : `${session.summary.userFilesModified} user-file changes`);
+  if (session.summary.startupChanges) reasons.push(zh ? '修改了登录自启动配置' : 'Changed sign-in startup configuration');
+  if (session.summary.browserChanges) reasons.push(zh ? '修改了浏览器配置或策略' : 'Changed browser configuration or policy');
+  if (session.summary.networkChanges) reasons.push(zh ? '修改了网络设置' : 'Changed network settings');
+  if (session.registryChanges.some(change => change.path.includes('Policies'))) reasons.push(zh ? '写入了策略区域' : 'Wrote to a policy area');
+  return reasons;
 }

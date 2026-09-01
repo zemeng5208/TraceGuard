@@ -64,6 +64,7 @@ const previewApi: TraceGuardApi = {
   getSystemAccent: async () => '#4c97ff',
   exportSettings: async () => ({ success: true, message: 'Settings exported.', messageZh: '设置已导出。' }),
   importSettings: async () => ({ success: false, message: 'Available in the desktop app.', messageZh: '请在桌面应用中使用。' }),
+  exportReport: async () => ({ success: true, message: 'Report exported.', messageZh: '报告已导出。' }),
   stopProcess: async () => ({ success: false, message: 'Preview mode', messageZh: '预览模式不可执行系统操作' }),
   stopService: async () => ({ success: false, message: 'Preview mode', messageZh: '预览模式不可执行系统操作' }),
   showSurface: async (surface) => {

@@ -49,7 +49,7 @@ public sealed class CoreHost : IDisposable
             await _events.CountCategoryAsync("registry"),
             CountProcesses(),
             CountServices(),
-            0,
+            sample.IoBytesPerSecond,
             sample.NetworkBytesPerSecond,
             sample.Cpu,
             sample.Memory,

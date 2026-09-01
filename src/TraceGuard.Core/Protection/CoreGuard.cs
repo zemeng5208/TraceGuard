@@ -9,7 +9,10 @@ public static class CoreGuard
 
     private static readonly HashSet<string> ProtectedServices = new(StringComparer.OrdinalIgnoreCase)
     {
-        "RpcSs", "DcomLaunch", "RpcEptMapper", "PlugPlay", "Power", "EventLog", "SamSs", "Schedule", "Winmgmt"
+        "RpcSs", "DcomLaunch", "RpcEptMapper", "PlugPlay", "Power", "EventLog", "SamSs", "Schedule", "Winmgmt",
+        "BrokerInfrastructure", "LSM", "ProfSvc", "UserManager", "Appinfo", "CryptSvc", "BFE", "MpsSvc",
+        "WinDefend", "WdNisSvc", "SecurityHealthService", "Dhcp", "Dnscache", "NlaSvc",
+        "wuauserv", "UsoSvc", "DoSvc", "BITS", "TrustedInstaller"
     };
 
     public static bool IsProtectedProcess(string? processName)

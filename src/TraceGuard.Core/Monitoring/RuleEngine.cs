@@ -36,8 +36,16 @@ public sealed class RuleEngine(EventStore store, Action<TraceEvent> publish)
         if (rule is null) return;
         var source = LaunchSourceAnalyzer.Analyze(process);
         var automatic = source is not "user" and not "parent-process";
-        var shouldBlock = automatic && (rule.BlockAutoRestart || string.Equals(rule.AutoStartAction, "block", StringComparison.OrdinalIgnoreCase));
-        if (!shouldBlock) return;
+        var action = automatic && rule.BlockAutoRestart ? "block" : automatic ? rule.AutoStartAction : rule.ManualStartAction;
+        if (string.Equals(action, "allow", StringComparison.OrdinalIgnoreCase)) return;
+        if (string.Equals(action, "ask", StringComparison.OrdinalIgnoreCase))
+        {
+            publish(new TraceEvent(0, DateTimeOffset.UtcNow, "process", "RULE_DECISION_REQUIRED",
+                "A process matched an Ask rule and was allowed for this launch", "进程匹配询问规则，本次启动已暂时允许",
+                $"{process.Name} · Source: {source} · Open Rules to choose a persistent behavior.", process.Name, process.Pid, rule.Notify ? "important" : "normal"));
+            return;
+        }
+        if (!string.Equals(action, "block", StringComparison.OrdinalIgnoreCase)) return;
         if (CoreGuard.IsProtectedProcess(process.Name))
         {
             PublishObserved(process, source, "Protected Windows Core Component", "Windows 核心受保护组件");
@@ -45,7 +53,10 @@ public sealed class RuleEngine(EventStore store, Action<TraceEvent> publish)
         }
         var result = WindowsCollectors.StopProcess(process.Pid);
         if (result.Success)
-            publish(new TraceEvent(0, DateTimeOffset.UtcNow, "process", "AUTO_RESTART_BLOCKED", "Blocked an automatic process restart", "已阻止程序自动重新启动", $"{process.Name} · Source: {source}", process.Name, process.Pid, "important"));
+            publish(new TraceEvent(0, DateTimeOffset.UtcNow, "process", automatic ? (rule.Notify ? "AUTO_RESTART_BLOCKED" : "AUTO_RESTART_BLOCKED_SILENT") : "MANUAL_LAUNCH_BLOCKED",
+                automatic ? "Blocked an automatic process restart" : "Blocked a manual process launch",
+                automatic ? "已阻止程序自动重新启动" : "已阻止手动启动的程序",
+                $"{process.Name} · Source: {source}", process.Name, process.Pid, rule.Notify ? "important" : "normal"));
         else
             PublishObserved(process, source, result.Message ?? "Observed but cannot be controlled in Zero-Privilege Mode.", result.MessageZh ?? "已检测到，但零提权模式下当前用户没有权限控制。");
     }

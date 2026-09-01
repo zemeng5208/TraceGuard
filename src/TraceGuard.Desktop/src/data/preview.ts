@@ -47,8 +47,15 @@ export const defaultSettings: AppSettings = {
   bubbleDoubleClickAction: 'console',
   terminalMode: 'easy',
   terminalAutoScroll: true,
+  terminalPauseOnHover: false,
   terminalTimestampMilliseconds: false,
   terminalMaxRows: 1000,
+  terminalFontSize: 'default',
+  terminalShowCategory: true,
+  terminalShowProcess: true,
+  terminalShowPid: false,
+  terminalShowFullPath: true,
+  terminalHiddenCategories: [],
   notificationLevel: 'important',
   notificationSound: true,
   notifySystemChange: true,
@@ -121,10 +128,10 @@ export const previewEvents: TraceEvent[] = [
 ];
 
 export const previewProcesses: ProcessRow[] = [
-  { pid: 4528, parentPid: 4100, name: 'UpdateHelper.exe', executable: 'C:\\ProgramData\\ABC\\UpdateHelper.exe', cpuPercent: 3.2, memoryBytes: 82_231_296, publisher: 'ABC Software', permission: 'controllable' },
-  { pid: 1140, parentPid: 832, name: 'explorer.exe', executable: 'C:\\Windows\\explorer.exe', cpuPercent: 1.1, memoryBytes: 196_083_712, publisher: 'Microsoft Corporation', permission: 'controllable' },
-  { pid: 744, parentPid: 632, name: 'services.exe', executable: 'C:\\Windows\\System32\\services.exe', cpuPercent: 0.2, memoryBytes: 12_582_912, publisher: 'Microsoft Corporation', permission: 'protected' },
-  { pid: 820, parentPid: 744, name: 'svchost.exe', executable: 'C:\\Windows\\System32\\svchost.exe', cpuPercent: 0.8, memoryBytes: 38_797_312, publisher: 'Microsoft Corporation', permission: 'observable' },
+  { pid: 4528, parentPid: 4100, name: 'UpdateHelper.exe', executable: 'C:\\ProgramData\\ABC\\UpdateHelper.exe', cpuPercent: 3.2, memoryBytes: 82_231_296, ioBytesPerSecond: 2_450_000, publisher: 'ABC Software', permission: 'controllable' },
+  { pid: 1140, parentPid: 832, name: 'explorer.exe', executable: 'C:\\Windows\\explorer.exe', cpuPercent: 1.1, memoryBytes: 196_083_712, ioBytesPerSecond: 155_000, publisher: 'Microsoft Corporation', permission: 'controllable' },
+  { pid: 744, parentPid: 632, name: 'services.exe', executable: 'C:\\Windows\\System32\\services.exe', cpuPercent: 0.2, memoryBytes: 12_582_912, ioBytesPerSecond: 0, publisher: 'Microsoft Corporation', permission: 'protected' },
+  { pid: 820, parentPid: 744, name: 'svchost.exe', executable: 'C:\\Windows\\System32\\svchost.exe', cpuPercent: 0.8, memoryBytes: 38_797_312, ioBytesPerSecond: 340_000, publisher: 'Microsoft Corporation', permission: 'observable' },
 ];
 
 export const previewServices: ServiceRow[] = [

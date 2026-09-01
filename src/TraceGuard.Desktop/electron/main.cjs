@@ -261,6 +261,16 @@ ipcMain.handle('settings:import', async () => {
     return { success: true, message: 'Settings imported.', messageZh: '设置已导入。', settings };
   } catch (error) { return { success: false, message: String(error), messageZh: '导入设置失败，已保留原设置。' }; }
 });
+ipcMain.handle('report:export', async (_event, session) => {
+  try {
+    if (!session || typeof session !== 'object' || typeof session.id !== 'string' || typeof session.rootProcess !== 'string') throw new Error('Invalid report payload.');
+    const safeName = session.rootProcess.replace(/[^a-z0-9._-]/gi, '_');
+    const result = await dialog.showSaveDialog({ title: 'Export TraceGuard Report', defaultPath: `${safeName}-${session.id.slice(0, 8)}.traceguard.json`, filters: [{ name: 'TraceGuard Report', extensions: ['json'] }] });
+    if (result.canceled || !result.filePath) return { success: false, message: 'Export cancelled.', messageZh: '已取消导出。' };
+    fs.writeFileSync(result.filePath, JSON.stringify({ format: 'traceguard-report', version: 1, exportedAt: new Date().toISOString(), session }, null, 2), 'utf8');
+    return { success: true, message: 'Report exported.', messageZh: '报告已导出。' };
+  } catch (error) { return { success: false, message: String(error), messageZh: '导出报告失败。' }; }
+});
 ipcMain.handle('window:action', (event, action) => {
   const window = BrowserWindow.fromWebContents(event.sender);
   if (!window) return;

@@ -34,7 +34,7 @@ public sealed record TraceEvent(
     int? Pid,
     string Severity);
 
-public sealed record ProcessRow(int Pid, int? ParentPid, string Name, string? Executable, double CpuPercent, long MemoryBytes, string? Publisher, string Permission);
+public sealed record ProcessRow(int Pid, int? ParentPid, string Name, string? Executable, double CpuPercent, long MemoryBytes, long IoBytesPerSecond, string? Publisher, string Permission);
 public sealed record ServiceRow(string Name, string DisplayName, string Status, string StartType, string? Executable, string? Publisher, string Category, string Permission);
 public sealed record StartupRow(string Name, string Command, string Source, bool Enabled, string Permission);
 public sealed record RestoreItem(string Id, string Name, string Source, string OriginalCommand, DateTimeOffset DisabledAt, string Permission);
@@ -115,8 +115,15 @@ public sealed record AppSettings
     public string BubbleDoubleClickAction { get; init; } = "console";
     public string TerminalMode { get; init; } = "easy";
     public bool TerminalAutoScroll { get; init; } = true;
+    public bool TerminalPauseOnHover { get; init; }
     public bool TerminalTimestampMilliseconds { get; init; }
     public int TerminalMaxRows { get; init; } = 1000;
+    public string TerminalFontSize { get; init; } = "default";
+    public bool TerminalShowCategory { get; init; } = true;
+    public bool TerminalShowProcess { get; init; } = true;
+    public bool TerminalShowPid { get; init; }
+    public bool TerminalShowFullPath { get; init; } = true;
+    public string[] TerminalHiddenCategories { get; init; } = [];
     public string NotificationLevel { get; init; } = "important";
     public bool NotificationSound { get; init; } = true;
     public bool NotifySystemChange { get; init; } = true;

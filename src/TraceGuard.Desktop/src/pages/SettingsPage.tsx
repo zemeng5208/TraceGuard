@@ -5,7 +5,7 @@ import {
 } from 'lucide-react';
 import { useDeferredValue, useEffect, useMemo, useState, type CSSProperties, type ReactNode } from 'react';
 import { isChinese, secondaryText, text } from '@/i18n';
-import type { AppSettings, StorageInfo } from '@/types';
+import type { AppSettings, EventCategory, StorageInfo } from '@/types';
 import { defaultSettings } from '@/data/preview';
 import { traceGuardApi } from '@/bridge';
 
@@ -37,7 +37,7 @@ const sectionDefaults: Record<SectionId, Array<keyof AppSettings>> = {
   monitoring: ['fileMonitoring', 'processMonitoring', 'serviceMonitoring', 'startupMonitoring', 'registryMonitoring', 'browserMonitoring', 'updateMonitoring', 'networkMonitoring', 'fullDiskMonitoring'],
   floatingWindow: ['floatingWidgetEnabled', 'alwaysOnTop', 'clickThrough', 'widgetOpacity', 'widgetSize', 'widgetRefreshMs', 'autoCollapse', 'edgeSnap', 'rememberWidgetPosition'],
   floatingBubble: ['bubbleSize', 'bubbleLabel', 'showBadgeCount', 'showUpdateStatus', 'showRecordingStatus', 'hoverPreview', 'hoverDelayMs', 'bubbleSingleClickAction', 'bubbleDoubleClickAction'],
-  liveTerminal: ['terminalMode', 'terminalAutoScroll', 'terminalTimestampMilliseconds', 'terminalMaxRows'],
+  liveTerminal: ['terminalMode', 'terminalAutoScroll', 'terminalPauseOnHover', 'terminalTimestampMilliseconds', 'terminalMaxRows', 'terminalFontSize', 'terminalShowCategory', 'terminalShowProcess', 'terminalShowPid', 'terminalShowFullPath', 'terminalHiddenCategories'],
   notifications: ['notificationLevel', 'notificationSound', 'notifySystemChange', 'notifyStartup', 'notifyService', 'notifyBrowser', 'notifyBlockedRestart', 'notifyInstallerComplete', 'notifyWindowsUpdate', 'notifyUserFiles'],
   startupBackground: ['keepMonitoringOnClose', 'lowPowerMode', 'pauseOnBattery'],
   privacy: ['storeFilePaths'], storage: ['retentionDays'],
@@ -171,8 +171,15 @@ function StandardContent({ section, settings, onChange }: SettingsContentProps &
   else if (section === 'liveTerminal') body = <SettingCard title={isZh ? '终端显示' : 'Terminal display'}>
     <SettingRow title={isZh ? '默认模式' : 'Default Mode'} description={isZh ? '简易模式解释行为，原始模式保留技术字段。' : 'Easy explains activity; Raw preserves technical fields.'}><Choices value={settings.terminalMode} options={[{ value: 'easy', label: text('easy', settings.locale) }, { value: 'raw', label: text('raw', settings.locale) }]} onChange={(terminalMode) => onChange({ terminalMode })} /></SettingRow>
     <SettingRow title={isZh ? '自动滚动' : 'Auto Scroll'} description={isZh ? '新事件到达时跟随最新内容。' : 'Follows the newest event as it arrives.'}><Toggle checked={settings.terminalAutoScroll} onChange={(terminalAutoScroll) => onChange({ terminalAutoScroll })} /></SettingRow>
+    <SettingRow title={isZh ? '悬停时暂停视图' : 'Pause on Hover'} description={isZh ? '只冻结当前显示；后台采集和 SQLite 记录不会停止。' : 'Freezes the view only; collection and SQLite recording continue.'}><Toggle checked={settings.terminalPauseOnHover} onChange={(terminalPauseOnHover)=>onChange({terminalPauseOnHover})}/></SettingRow>
     <SettingRow title={isZh ? '毫秒时间戳' : 'Millisecond timestamps'} description="HH:mm:ss.fff"><Toggle checked={settings.terminalTimestampMilliseconds} onChange={(terminalTimestampMilliseconds) => onChange({ terminalTimestampMilliseconds })} /></SettingRow>
     <SettingRow title={isZh ? '最大可见行数' : 'Maximum Visible Rows'} description={isZh ? '限制界面内存，不影响 SQLite 事件历史。' : 'Limits UI memory without changing SQLite history.'}><Choices value={settings.terminalMaxRows} options={[{value:250,label:'250'},{value:500,label:'500'},{value:1000,label:'1,000'},{value:2000,label:'2,000'}]} onChange={(terminalMaxRows)=>onChange({terminalMaxRows})}/></SettingRow>
+    <SettingRow title={isZh ? '终端字体大小' : 'Terminal Font Size'} description={isZh ? '使用系统 Consolas 等宽字体。' : 'Uses the system Consolas monospace font.'}><Choices value={settings.terminalFontSize} options={[{value:'small',label:isZh?'小':'Small'},{value:'default',label:isZh?'默认':'Default'},{value:'large',label:isZh?'大':'Large'}]} onChange={(terminalFontSize)=>onChange({terminalFontSize})}/></SettingRow>
+    <SettingRow title={isZh ? '显示事件分类' : 'Show Event Category'} description={isZh ? '显示 FILE、REGISTRY、PROCESS 等类型。' : 'Shows FILE, REGISTRY, PROCESS, and related types.'}><Toggle checked={settings.terminalShowCategory} onChange={(terminalShowCategory)=>onChange({terminalShowCategory})}/></SettingRow>
+    <SettingRow title={isZh ? '显示进程名' : 'Show Process Name'} description={isZh ? '在简易与原始模式中显示来源进程。' : 'Shows source process names in Easy and Raw modes.'}><Toggle checked={settings.terminalShowProcess} onChange={(terminalShowProcess)=>onChange({terminalShowProcess})}/></SettingRow>
+    <SettingRow title={isZh ? '显示 PID' : 'Show PID'} description={isZh ? '仅在事件能够归属到进程时显示。' : 'Shown only when an event can be attributed to a process.'}><Toggle checked={settings.terminalShowPid} onChange={(terminalShowPid)=>onChange({terminalShowPid})}/></SettingRow>
+    <SettingRow title={isZh ? '显示完整技术路径' : 'Show Full Technical Path'} description={isZh ? '关闭后简易模式只显示解释。原始模式始终保留原值。' : 'When off, Easy mode shows explanations only. Raw always preserves original values.'}><Toggle checked={settings.terminalShowFullPath} onChange={(terminalShowFullPath)=>onChange({terminalShowFullPath})}/></SettingRow>
+    <SettingRow title={isZh ? '默认事件过滤' : 'Default Event Filters'} description={isZh ? '点亮表示默认显示；可在终端中临时切换分类。' : 'Highlighted categories are shown by default; Terminal filters remain available.'}><div className="default-filter-grid">{(['file','registry','process','service','startup','browser','network','update'] as EventCategory[]).map(category=>{const visible=!settings.terminalHiddenCategories.includes(category);return <button type="button" key={category} className={visible?'is-selected':''} onClick={()=>onChange({terminalHiddenCategories:visible?[...settings.terminalHiddenCategories,category]:settings.terminalHiddenCategories.filter(item=>item!==category)})}>{category.toUpperCase()}</button>})}</div></SettingRow>
   </SettingCard>;
   else if (section === 'notifications') {
     const notificationRows: Array<[string,string,keyof AppSettings]> = [

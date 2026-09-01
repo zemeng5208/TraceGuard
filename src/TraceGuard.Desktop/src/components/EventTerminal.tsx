@@ -1,5 +1,5 @@
 import { Pause, Play, Search, Trash2 } from 'lucide-react';
-import { useDeferredValue, useMemo, useState } from 'react';
+import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import { isChinese, text } from '@/i18n';
 import type { AppSettings, EventCategory, TraceEvent } from '@/types';
 
@@ -14,26 +14,34 @@ const categoryKeys: Record<EventCategory, string> = { file: 'files', registry: '
 export function EventTerminal({ events, settings, standalone = false }: { events: TraceEvent[]; settings: AppSettings; standalone?: boolean }) {
   const [category, setCategory] = useState<'all' | EventCategory>('all');
   const [paused, setPaused] = useState(false);
+  const [pauseSnapshot, setPauseSnapshot] = useState<TraceEvent[] | null>(null);
   const [query, setQuery] = useState('');
   const deferredQuery = useDeferredValue(query.trim().toLowerCase());
   const [clearedAt, setClearedAt] = useState<number | null>(null);
+  const outputRef = useRef<HTMLDivElement>(null);
+  const hoverPaused = useRef(false);
+  const pauseView = () => { setPauseSnapshot(events); setPaused(true); };
+  const resumeView = () => { setPauseSnapshot(null); setPaused(false); };
 
   const visible = useMemo(() => {
-    if (paused) return events.slice(0, 80);
-    return events.filter((event) => {
+    const source = paused && pauseSnapshot ? pauseSnapshot : events;
+    return source.filter((event) => {
       if (clearedAt && new Date(event.timestamp).getTime() <= clearedAt) return false;
       if (category !== 'all' && event.category !== category) return false;
+      if (settings.terminalHiddenCategories.includes(event.category)) return false;
       if (!deferredQuery) return true;
       return `${event.action} ${event.detail} ${event.processName ?? ''} ${event.easyMessage} ${event.easyMessageZh}`.toLowerCase().includes(deferredQuery);
     }).slice(0, settings.terminalMaxRows);
-  }, [category, clearedAt, deferredQuery, events, paused, settings.terminalMaxRows]);
+  }, [category, clearedAt, deferredQuery, events, pauseSnapshot, paused, settings.terminalHiddenCategories, settings.terminalMaxRows]);
+
+  useEffect(() => { if (settings.terminalAutoScroll && !paused && outputRef.current) outputRef.current.scrollTop = 0; }, [events, paused, settings.terminalAutoScroll]);
 
   return (
     <section className={`terminal-panel ${standalone ? 'terminal-panel--standalone' : ''}`}>
       <header className="terminal-toolbar">
         <div className="terminal-brand"><span className="mini-logo">TG</span><strong>{text('liveTerminal', settings.locale)}</strong><small>{isChinese(settings.locale) ? 'Live Terminal' : '实时终端'}</small></div>
         <div className="terminal-actions">
-          <button type="button" onClick={() => setPaused((value) => !value)}>{paused ? <Play size={14} /> : <Pause size={14} />}{paused ? text('resume', settings.locale) : text('pause', settings.locale)}</button>
+          <button type="button" onClick={() => paused ? resumeView() : pauseView()}>{paused ? <Play size={14} /> : <Pause size={14} />}{paused ? text('resume', settings.locale) : text('pause', settings.locale)}</button>
           <button type="button" onClick={() => setClearedAt(Date.now())}><Trash2 size={14} />{text('clear', settings.locale)}</button>
         </div>
       </header>
@@ -45,15 +53,15 @@ export function EventTerminal({ events, settings, standalone = false }: { events
           </button>
         ))}
       </div>
-      <div className="terminal-output" role="log" aria-live="polite">
+      <div ref={outputRef} className={`terminal-output terminal-font-${settings.terminalFontSize}`} role="log" aria-live="polite" onMouseEnter={()=>{if(settings.terminalPauseOnHover&&!paused){hoverPaused.current=true;pauseView();}}} onMouseLeave={()=>{if(hoverPaused.current){hoverPaused.current=false;resumeView();}}}>
         {visible.map((event) => (
           <div className="terminal-line" key={event.id}>
             <time>{new Date(event.timestamp).toLocaleTimeString([], { hour12: false, fractionalSecondDigits: settings.terminalTimestampMilliseconds ? 3 : undefined })}</time>
-            <strong className={`terminal-category category-${event.category}`}>[{event.category.toUpperCase()} {event.action}]</strong>
+            {settings.terminalShowCategory ? <strong className={`terminal-category category-${event.category}`}>[{event.category.toUpperCase()} {event.action}]</strong> : <strong />}
             {settings.terminalMode === 'raw' ? (
-              <span>{event.detail}{event.processName ? ` (${event.processName}${event.pid ? ` PID:${event.pid}` : ''})` : ''}</span>
+              <span>{event.detail}{settings.terminalShowProcess && event.processName ? ` (${event.processName}${settings.terminalShowPid && event.pid ? ` PID:${event.pid}` : ''})` : ''}</span>
             ) : (
-              <span>{isChinese(settings.locale) ? event.easyMessageZh : event.easyMessage}<em>{event.processName ? ` · ${event.processName}` : ''}</em></span>
+              <span>{isChinese(settings.locale) ? event.easyMessageZh : event.easyMessage}{settings.terminalShowFullPath ? <small>{event.detail}</small> : null}<em>{settings.terminalShowProcess && event.processName ? ` · ${event.processName}${settings.terminalShowPid && event.pid ? ` PID:${event.pid}` : ''}` : ''}</em></span>
             )}
           </div>
         ))}

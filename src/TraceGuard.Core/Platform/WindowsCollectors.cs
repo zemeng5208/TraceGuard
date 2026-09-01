@@ -15,6 +15,8 @@ public static class WindowsCollectors
     private static readonly object ScheduledTaskGate = new();
     private static IReadOnlyList<StartupRow> _scheduledTasks = [];
     private static DateTimeOffset _scheduledTasksAt = DateTimeOffset.MinValue;
+    private static readonly object ProcessMetricsGate = new();
+    private static readonly Dictionary<int, (DateTimeOffset At, double CpuMs, long IoBytes)> ProcessMetrics = [];
 
     public static IReadOnlyList<ProcessRow> Processes()
     {
@@ -27,7 +29,8 @@ public static class WindowsCollectors
                 var name = process.ProcessName;
                 var path = Try(() => process.MainModule?.FileName);
                 var permission = CoreGuard.IsProtectedProcess(name) ? "protected" : CanTerminate(process.Id) ? "controllable" : "observable";
-                rows.Add(new ProcessRow(process.Id, parentPids.GetValueOrDefault(process.Id), name + ".exe", path, 0, Try(() => process.WorkingSet64), null, permission));
+                var metrics = SampleProcessMetrics(process);
+                rows.Add(new ProcessRow(process.Id, parentPids.GetValueOrDefault(process.Id), name + ".exe", path, metrics.Cpu, Try(() => process.WorkingSet64), metrics.IoBytesPerSecond, null, permission));
             }
             catch { }
             finally { process.Dispose(); }
@@ -43,7 +46,7 @@ public static class WindowsCollectors
             try
             {
                 var protectedService = CoreGuard.IsProtectedService(service.ServiceName);
-                var canControl = !protectedService && service.CanStop;
+                var canControl = !protectedService && service.CanStop && CanControlService(service.ServiceName);
                 rows.Add(new ServiceRow(
                     service.ServiceName,
                     service.DisplayName,
@@ -312,9 +315,65 @@ public static class WindowsCollectors
         return true;
     }
 
+    private static bool CanControlService(string name)
+    {
+        var manager = OpenSCManager(null, null, 0x0001);
+        if (manager == IntPtr.Zero) return false;
+        try
+        {
+            var service = OpenService(manager, name, 0x0020);
+            if (service == IntPtr.Zero) return false;
+            CloseServiceHandle(service);
+            return true;
+        }
+        finally { CloseServiceHandle(manager); }
+    }
+
+    private static (double Cpu, long IoBytesPerSecond) SampleProcessMetrics(Process process)
+    {
+        var now = DateTimeOffset.UtcNow;
+        var cpuMs = Try(() => process.TotalProcessorTime.TotalMilliseconds);
+        var ioBytes = TryGetIoBytes(process.Id);
+        lock (ProcessMetricsGate)
+        {
+            var cpu = 0d;
+            var ioRate = 0L;
+            if (ProcessMetrics.TryGetValue(process.Id, out var previous))
+            {
+                var seconds = Math.Max(.1, (now - previous.At).TotalSeconds);
+                cpu = Math.Clamp((cpuMs - previous.CpuMs) / (seconds * 1000 * Math.Max(1, Environment.ProcessorCount)) * 100, 0, 100);
+                ioRate = Math.Max(0, (long)((ioBytes - previous.IoBytes) / seconds));
+            }
+            ProcessMetrics[process.Id] = (now, cpuMs, ioBytes);
+            if (ProcessMetrics.Count > 4096)
+            {
+                foreach (var stale in ProcessMetrics.Where(item => now - item.Value.At > TimeSpan.FromMinutes(2)).Select(item => item.Key).ToArray()) ProcessMetrics.Remove(stale);
+            }
+            return (cpu, ioRate);
+        }
+    }
+
+    internal static long TryGetIoBytes(int pid)
+    {
+        var handle = OpenProcess(0x1000, false, pid);
+        if (handle == IntPtr.Zero) return 0;
+        try
+        {
+            if (!GetProcessIoCounters(handle, out var counters)) return 0;
+            var total = counters.ReadTransferCount > ulong.MaxValue - counters.WriteTransferCount ? ulong.MaxValue : counters.ReadTransferCount + counters.WriteTransferCount;
+            return total > long.MaxValue ? long.MaxValue : (long)total;
+        }
+        finally { CloseHandle(handle); }
+    }
+
     private static T? Try<T>(Func<T> action) { try { return action(); } catch { return default; } }
     [DllImport("kernel32.dll", SetLastError = true)] private static extern IntPtr OpenProcess(uint access, bool inherit, int processId);
     [DllImport("kernel32.dll")] private static extern bool CloseHandle(IntPtr handle);
+    [DllImport("advapi32.dll", CharSet = CharSet.Unicode, SetLastError = true)] private static extern IntPtr OpenSCManager(string? machineName, string? databaseName, uint desiredAccess);
+    [DllImport("advapi32.dll", CharSet = CharSet.Unicode, SetLastError = true)] private static extern IntPtr OpenService(IntPtr manager, string serviceName, uint desiredAccess);
+    [DllImport("advapi32.dll", SetLastError = true)] private static extern bool CloseServiceHandle(IntPtr handle);
+    [StructLayout(LayoutKind.Sequential)] private struct IoCounters { public ulong ReadOperationCount; public ulong WriteOperationCount; public ulong OtherOperationCount; public ulong ReadTransferCount; public ulong WriteTransferCount; public ulong OtherTransferCount; }
+    [DllImport("kernel32.dll", SetLastError = true)] private static extern bool GetProcessIoCounters(IntPtr processHandle, out IoCounters counters);
 }
 
 public sealed class SystemSampler
@@ -324,13 +383,15 @@ public sealed class SystemSampler
     private ulong _previousUser;
     private long _previousNetwork;
     private DateTimeOffset _previousNetworkAt = DateTimeOffset.UtcNow;
+    private long _previousIo;
+    private DateTimeOffset _previousIoAt = DateTimeOffset.UtcNow;
 
-    public (double Cpu, double Memory, long NetworkBytesPerSecond) Sample()
+    public (double Cpu, double Memory, long NetworkBytesPerSecond, long IoBytesPerSecond) Sample()
     {
         var cpu = SampleCpu();
         var memory = SampleMemory();
         var network = SampleNetwork();
-        return (cpu, memory, network);
+        return (cpu, memory, network, SampleIo());
     }
 
     private double SampleCpu()
@@ -356,6 +417,22 @@ public sealed class SystemSampler
         var seconds = Math.Max(.1, (now - _previousNetworkAt).TotalSeconds);
         var rate = _previousNetwork == 0 ? 0 : Math.Max(0, (long)((total - _previousNetwork) / seconds));
         _previousNetwork = total; _previousNetworkAt = now;
+        return rate;
+    }
+
+    private long SampleIo()
+    {
+        long total = 0;
+        foreach (var process in Process.GetProcesses())
+        {
+            try { total = checked(total + WindowsCollectors.TryGetIoBytes(process.Id)); }
+            catch (OverflowException) { total = long.MaxValue; }
+            finally { process.Dispose(); }
+        }
+        var now = DateTimeOffset.UtcNow;
+        var seconds = Math.Max(.1, (now - _previousIoAt).TotalSeconds);
+        var rate = _previousIo == 0 || total < _previousIo ? 0 : Math.Max(0, (long)((total - _previousIo) / seconds));
+        _previousIo = total; _previousIoAt = now;
         return rate;
     }
 
