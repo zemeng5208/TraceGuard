@@ -20,3 +20,7 @@ CoreGuard rejects destructive actions against critical Windows processes and inf
 - Disabling path storage replaces event details with a non-path summary.
 - Browser monitoring must not read passwords, cookies, form data, or browsing-history content.
 - TraceGuard currently sends no telemetry.
+
+## ETW boundary
+
+Windows restricts general ETW session control to administrators, the built-in `Performance Log Users` group, and specific service accounts; NT Kernel Logger control is stricter. TraceGuard only inspects the current token for existing `Performance Log Users` membership. It never adds the user to that group, requests elevation, starts a privileged kernel session, or reports provider attribution as active before it is actually implemented and verified.

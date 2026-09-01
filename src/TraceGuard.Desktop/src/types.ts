@@ -48,7 +48,7 @@ export interface Overview {
 }
 
 export interface MonitorModuleStatus {
-  id: 'file' | 'process' | 'registry' | 'service' | 'startup' | 'browser' | 'network' | 'update' | 'usn';
+  id: 'file' | 'process' | 'registry' | 'service' | 'startup' | 'browser' | 'network' | 'update' | 'usn' | 'etw';
   state: 'active' | 'available' | 'reduced' | 'paused' | 'disabled' | 'unavailable';
   message: string;
   messageZh: string;

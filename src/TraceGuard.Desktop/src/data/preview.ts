@@ -103,6 +103,7 @@ export const previewOverview: Overview = {
     { id: 'network', state: 'disabled', message: 'Disabled in Settings.', messageZh: '已在设置中关闭。' },
     { id: 'update', state: 'active', message: 'Windows Update observation is active.', messageZh: 'Windows Update 活动观察正在运行。' },
     { id: 'usn', state: 'available', message: 'Readable with the current user token on C:. FileSystemWatcher remains active until journal event attribution is enabled.', messageZh: '当前用户令牌可读取 C:。在 USN 事件归属功能启用前仍继续使用 FileSystemWatcher。' },
+    { id: 'etw', state: 'unavailable', message: 'The current token cannot control general ETW sessions. TraceGuard will not request elevation or change group membership.', messageZh: '当前令牌无法控制常规 ETW 会话。TraceGuard 不会请求提权或修改用户组成员身份。' },
   ],
   activeInstaller: { name: 'ABC_Setup.exe', pid: 4528, elapsedSeconds: 204, changeCount: 428 },
 };

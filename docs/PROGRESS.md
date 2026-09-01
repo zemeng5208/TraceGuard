@@ -23,6 +23,7 @@
 - [x] Published-core IPC smoke test running as the ordinary Windows CI user
 - [x] Duplicate startup/scheduled-task rows are deterministically de-duplicated without hiding distinct commands
 - [x] Release artifact structure, PE headers, minimum sizes, and SHA-256 checksums are validated in CI
+- [x] Evaluate current-token ETW session eligibility without starting a session or changing permissions
 
 ## Phase 2 — complete
 
@@ -56,7 +57,8 @@
 - [x] Remove hard-coded disk/network percentages and sample telemetry from production UI
 - [x] Probe zero-privilege USN Journal readability per NTFS volume without creating or modifying journals
 - [ ] Read and attribute USN journal events on volumes where the current user token is sufficient
-- [ ] Evaluate user-session ETW providers without requiring elevation
+- [x] Evaluate current-token eligibility for user-session ETW control without requiring elevation
+- [ ] Enable and consume explicitly supported user-mode ETW providers only when the current token is eligible
 - [ ] Complete Windows 10/11 build, installer, and runtime smoke tests
 - [ ] Normalize release version and publish the first verified package
 

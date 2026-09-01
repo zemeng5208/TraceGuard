@@ -64,7 +64,9 @@ try {
 
     $overview = Invoke-CoreRpc -CoreProcess $process -Id 2 -Method 'getOverview'
     if ($overview.processCount -lt 1) { throw 'The process collector returned no running processes.' }
-    if ($overview.monitorModules.Count -lt 8) { throw 'Runtime collector health is incomplete.' }
+    if ($overview.monitorModules.Count -lt 10) { throw 'Runtime collector health is incomplete.' }
+    if (-not ($overview.monitorModules.id -contains 'usn')) { throw 'USN capability status was not reported.' }
+    if (-not ($overview.monitorModules.id -contains 'etw')) { throw 'ETW capability status was not reported.' }
 
     $pause = Invoke-CoreRpc -CoreProcess $process -Id 3 -Method 'pauseMonitoring'
     if (-not $pause.success) { throw 'Pause monitoring RPC failed.' }
