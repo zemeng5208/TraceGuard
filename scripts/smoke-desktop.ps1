@@ -1,12 +1,16 @@
+param(
+    [string]$Executable = './release/win-unpacked/TraceGuard.exe'
+)
+
 $ErrorActionPreference = 'Stop'
 
-$executable = Resolve-Path -LiteralPath './release/win-unpacked/TraceGuard.exe'
+$executablePath = Resolve-Path -LiteralPath $Executable
 $package = Get-Content -LiteralPath ./package.json -Raw | ConvertFrom-Json
 $smokeFile = Join-Path $env:RUNNER_TEMP "traceguard-desktop-smoke-$([guid]::NewGuid().ToString('N')).json"
 
 $startInfo = [System.Diagnostics.ProcessStartInfo]::new()
-$startInfo.FileName = $executable.Path
-$startInfo.WorkingDirectory = Split-Path -Parent $executable.Path
+$startInfo.FileName = $executablePath.Path
+$startInfo.WorkingDirectory = Split-Path -Parent $executablePath.Path
 $startInfo.UseShellExecute = $false
 $startInfo.Environment['TRACEGUARD_SMOKE_FILE'] = $smokeFile
 

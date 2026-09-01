@@ -26,6 +26,7 @@
 - [x] Evaluate current-token ETW session eligibility without starting a session or changing permissions
 - [x] Renderer, About page, Windows artifact, and .NET executable versions normalized to 0.2.0
 - [x] Full packaged Electron + React + C# Core desktop smoke test in Windows CI
+- [x] Per-user NSIS install, installed-app launch, and uninstall smoke test in Windows CI
 
 ## Phase 2 — complete
 

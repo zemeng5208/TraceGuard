@@ -32,6 +32,9 @@ jobs:
       - name: Smoke-test packaged desktop
         shell: pwsh
         run: ./scripts/smoke-desktop.ps1
+      - name: Smoke-test per-user install and uninstall
+        shell: pwsh
+        run: ./scripts/smoke-installer.ps1
       - name: Verify Windows package contents
         shell: pwsh
         run: ./scripts/verify-package.ps1
