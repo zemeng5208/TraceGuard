@@ -32,6 +32,9 @@ jobs:
       - name: Smoke-test packaged desktop
         shell: pwsh
         run: ./scripts/smoke-desktop.ps1
+      - name: Smoke-test portable package
+        shell: pwsh
+        run: ./scripts/smoke-portable.ps1
       - name: Smoke-test per-user install and uninstall
         shell: pwsh
         run: ./scripts/smoke-installer.ps1

@@ -13,6 +13,7 @@ $startInfo.FileName = $executablePath.Path
 $startInfo.WorkingDirectory = Split-Path -Parent $executablePath.Path
 $startInfo.UseShellExecute = $false
 $startInfo.Environment['TRACEGUARD_SMOKE_FILE'] = $smokeFile
+$startInfo.Environment['TRACEGUARD_SMOKE_EXIT'] = '1'
 
 $process = [System.Diagnostics.Process]::new()
 $process.StartInfo = $startInfo
@@ -33,6 +34,9 @@ try {
     if (-not $health.coreReady -or $health.processCount -lt 1 -or $health.serviceCount -lt 1) { throw 'Packaged C# Core did not return real system data.' }
     if ($health.monitorModules -lt 10) { throw "Expected 10 collector capability states, found $($health.monitorModules)." }
     if ($health.version -ne $package.version) { throw "Packaged desktop version mismatch: expected $($package.version), found $($health.version)." }
+
+    if (-not $process.WaitForExit(15000)) { throw 'Packaged TraceGuard did not exit cleanly after reporting test health.' }
+    if ($process.ExitCode -ne 0) { throw "Packaged TraceGuard exited with code $($process.ExitCode)." }
 
     Write-Host "TraceGuard desktop smoke test passed: version=$($health.version), processes=$($health.processCount), services=$($health.serviceCount), modules=$($health.monitorModules)"
 }

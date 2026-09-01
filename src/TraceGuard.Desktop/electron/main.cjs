@@ -240,6 +240,8 @@ async function writeDesktopSmokeStatus() {
     });
   } catch (error) {
     write({ success: false, packaged: app.isPackaged, version: app.getVersion(), error: error instanceof Error ? error.message : String(error) });
+  } finally {
+    if (process.env.TRACEGUARD_SMOKE_EXIT === '1') setTimeout(() => app.quit(), 100);
   }
 }
 

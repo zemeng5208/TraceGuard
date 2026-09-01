@@ -27,6 +27,7 @@
 - [x] Renderer, About page, Windows artifact, and .NET executable versions normalized to 0.2.0
 - [x] Full packaged Electron + React + C# Core desktop smoke test in Windows CI
 - [x] Per-user NSIS install, installed-app launch, and uninstall smoke test in Windows CI
+- [x] Final Portable wrapper extraction, full desktop launch, Core IPC, and clean-exit smoke test
 
 ## Phase 2 — complete
 
@@ -62,9 +63,9 @@
 - [ ] Read and attribute USN journal events on volumes where the current user token is sufficient
 - [x] Evaluate current-token eligibility for user-session ETW control without requiring elevation
 - [ ] Enable and consume explicitly supported user-mode ETW providers only when the current token is eligible
-- [ ] Complete Windows 10/11 build, installer, and runtime smoke tests
+- [ ] Complete Windows 10/11 hardware compatibility testing (automated Windows runner coverage is complete)
 - [ ] Normalize release version and publish the first verified package
 
 ## Next checkpoint
 
-Validate the published-core IPC smoke test in Windows CI, then continue with zero-privilege USN/ETW capability evaluation and full desktop runtime testing.
+Validate the final Portable wrapper in Windows CI, then continue with zero-privilege USN event reading and first-release preparation.
