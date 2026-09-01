@@ -2,6 +2,7 @@ using System.ComponentModel;
 using System.Diagnostics;
 using System.Net.NetworkInformation;
 using System.Runtime.InteropServices;
+using System.Text;
 using Microsoft.Win32;
 using System.ServiceProcess;
 using TraceGuard.Core.Models;
@@ -148,7 +149,7 @@ public static class WindowsCollectors
                 backup.SetValue("Name", name, RegistryValueKind.String);
                 backup.SetValue("Source", source, RegistryValueKind.String);
                 backup.SetValue("Command", Convert.ToString(value) ?? string.Empty, RegistryValueKind.String);
-                backup.SetValue("Kind", (int)(sourceKey.GetValueKind(name)), RegistryValueKind.DWord);
+                backup.SetValue("Kind", (int)sourceKey!.GetValueKind(name), RegistryValueKind.DWord);
                 backup.SetValue("DisabledAt", DateTimeOffset.UtcNow.ToString("O"), RegistryValueKind.String);
                 sourceKey!.DeleteValue(name, throwOnMissingValue: false);
                 return new(true, "User startup item disabled.", "用户级启动项已禁用。");
