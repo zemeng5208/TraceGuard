@@ -40,6 +40,11 @@ while ((line = await Console.In.ReadLineAsync()) is not null)
             "getProcesses" => host.GetProcesses(),
             "getServices" => host.GetServices(),
             "getStartupItems" => host.GetStartupItems(),
+            "getSessions" => await host.GetSessionsAsync(ReadInt(request.Params, "limit", 100)),
+            "getRules" => host.GetRules(),
+            "saveRule" => await host.SaveRuleAsync(ReadRule(request.Params)),
+            "deleteRule" => await host.DeleteRuleAsync(ReadString(request.Params, "id")),
+            "disableStartup" => host.DisableStartup(ReadString(request.Params, "name"), ReadString(request.Params, "source")),
             "getSettings" => host.GetSettings(),
             "updateSettings" => await host.UpdateSettingsAsync(ReadSettings(request.Params)),
             "pauseMonitoring" => host.PauseMonitoring(),
@@ -69,4 +74,10 @@ static AppSettings ReadSettings(JsonElement element)
 {
     if (element.ValueKind != JsonValueKind.Object || !element.TryGetProperty("settings", out var value)) throw new InvalidOperationException("Missing settings payload.");
     return value.Deserialize<AppSettings>(JsonDefaults.Options) ?? throw new InvalidOperationException("Invalid settings payload.");
+}
+
+static TraceRule ReadRule(JsonElement element)
+{
+    if (element.ValueKind != JsonValueKind.Object || !element.TryGetProperty("rule", out var value)) throw new InvalidOperationException("Missing rule payload.");
+    return value.Deserialize<TraceRule>(JsonDefaults.Options) ?? throw new InvalidOperationException("Invalid rule payload.");
 }

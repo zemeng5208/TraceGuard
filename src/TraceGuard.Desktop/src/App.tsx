@@ -8,10 +8,12 @@ import { TerminalPage } from '@/pages/TerminalPage';
 import { ProcessesPage } from '@/pages/ProcessesPage';
 import { ServicesPage } from '@/pages/ServicesPage';
 import { StartupPage } from '@/pages/StartupPage';
+import { ApplicationsPage } from '@/pages/ApplicationsPage';
+import { RulesPage } from '@/pages/RulesPage';
 import { SettingsPage } from '@/pages/SettingsPage';
 import { PlannedPage } from '@/pages/PlannedPage';
 import { BubbleSurface, TerminalSurface, WidgetSurface } from '@/components/FloatingSurfaces';
-import type { AppSettings, Overview, ProcessRow, ServiceRow, StartupRow, TraceEvent } from '@/types';
+import type { AppSettings, InstallationSession, Overview, ProcessRow, ServiceRow, StartupRow, TraceEvent, TraceRule } from '@/types';
 
 const api = traceGuardApi();
 
@@ -23,13 +25,15 @@ export function App() {
   const [processes, setProcesses] = useState<ProcessRow[]>([]);
   const [services, setServices] = useState<ServiceRow[]>([]);
   const [startup, setStartup] = useState<StartupRow[]>([]);
+  const [sessions, setSessions] = useState<InstallationSession[]>([]);
+  const [rules, setRules] = useState<TraceRule[]>([]);
   const [page, setPage] = useState<PageId>('dashboard');
   const [coreError, setCoreError] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     try {
-      const [nextOverview, nextEvents, nextProcesses, nextServices, nextStartup] = await Promise.all([
-        api.getOverview(), api.getEvents(250), api.getProcesses(), api.getServices(), api.getStartupItems(),
+      const [nextOverview, nextEvents, nextProcesses, nextServices, nextStartup, nextSessions, nextRules] = await Promise.all([
+        api.getOverview(), api.getEvents(250), api.getProcesses(), api.getServices(), api.getStartupItems(), api.getSessions(100), api.getRules(),
       ]);
       startTransition(() => {
         setOverview(nextOverview);
@@ -37,6 +41,8 @@ export function App() {
         setProcesses(nextProcesses);
         setServices(nextServices);
         setStartup(nextStartup);
+        setSessions(nextSessions);
+        setRules(nextRules);
         setCoreError(null);
       });
     } catch (error) {
@@ -85,7 +91,7 @@ export function App() {
   }, [settings]);
 
   useEffect(() => api.onNavigate((nextPage) => {
-    if (['dashboard', 'terminal', 'processes', 'services', 'disk', 'network', 'update', 'files', 'registry', 'startup', 'browser', 'rules', 'restore', 'settings'].includes(nextPage)) {
+    if (['dashboard', 'terminal', 'applications', 'processes', 'services', 'disk', 'network', 'update', 'files', 'registry', 'startup', 'browser', 'rules', 'restore', 'settings'].includes(nextPage)) {
       setPage(nextPage as PageId);
     }
   }), []);
@@ -93,7 +99,7 @@ export function App() {
   useEffect(() => {
     if (settings.restoreLastPage) {
       const saved = localStorage.getItem('traceguard:last-page');
-      if (saved && ['dashboard', 'terminal', 'processes', 'services', 'disk', 'network', 'update', 'files', 'registry', 'startup', 'browser', 'rules', 'restore', 'settings'].includes(saved)) setPage(saved as PageId);
+      if (saved && ['dashboard', 'terminal', 'applications', 'processes', 'services', 'disk', 'network', 'update', 'files', 'registry', 'startup', 'browser', 'rules', 'restore', 'settings'].includes(saved)) setPage(saved as PageId);
     }
   }, [settings.restoreLastPage]);
 
@@ -105,15 +111,17 @@ export function App() {
 
   const pageNode = useMemo(() => {
     switch (page) {
-      case 'dashboard': return <DashboardPage overview={overview} events={events} settings={settings} />;
+      case 'dashboard': return <DashboardPage overview={overview} events={events} settings={settings} onViewReports={() => setPage('applications')} />;
       case 'terminal': return <TerminalPage events={events} settings={settings} />;
+      case 'applications': return <ApplicationsPage sessions={sessions} settings={settings} />;
       case 'processes': return <ProcessesPage rows={processes} settings={settings} />;
       case 'services': return <ServicesPage rows={services} settings={settings} />;
-      case 'startup': return <StartupPage rows={startup} settings={settings} />;
+      case 'startup': return <StartupPage rows={startup} settings={settings} onChanged={refresh} />;
+      case 'rules': return <RulesPage rules={rules} settings={settings} onChanged={refresh} />;
       case 'settings': return <SettingsPage settings={settings} onChange={updateSettings} />;
       default: return <PlannedPage page={page} settings={settings} />;
     }
-  }, [events, overview, page, processes, services, settings, startup, updateSettings]);
+  }, [events, overview, page, processes, refresh, rules, services, sessions, settings, startup, updateSettings]);
 
   return (
     <div className={`app-shell visual-${settings.visualStyle}`}>

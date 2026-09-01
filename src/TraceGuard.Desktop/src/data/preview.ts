@@ -1,4 +1,4 @@
-import type { AppSettings, Overview, ProcessRow, ServiceRow, StartupRow, TraceEvent } from '@/types';
+import type { AppSettings, InstallationSession, Overview, ProcessRow, ServiceRow, StartupRow, TraceEvent, TraceRule } from '@/types';
 
 export const defaultSettings: AppSettings = {
   schemaVersion: 1,
@@ -22,7 +22,7 @@ export const defaultSettings: AppSettings = {
   processMonitoring: true,
   serviceMonitoring: true,
   startupMonitoring: true,
-  registryMonitoring: false,
+  registryMonitoring: true,
   browserMonitoring: false,
   updateMonitoring: true,
   networkMonitoring: false,
@@ -125,4 +125,22 @@ export const previewStartup: StartupRow[] = [
   { name: 'UpdateHelper', command: 'C:\\ProgramData\\ABC\\UpdateHelper.exe --background', source: 'run', enabled: true, permission: 'controllable' },
   { name: 'OneDrive', command: 'C:\\Users\\John\\AppData\\Local\\Microsoft\\OneDrive\\OneDrive.exe /background', source: 'run', enabled: true, permission: 'controllable' },
   { name: 'SecurityHealth', command: '%windir%\\system32\\SecurityHealthSystray.exe', source: 'run', enabled: true, permission: 'protected' },
+];
+
+export const previewSessions: InstallationSession[] = [{
+  id: 'preview-session', rootProcess: 'ABC_Setup.exe', rootPid: 4528, startedAt: new Date(now - 204_000).toISOString(), status: 'recording', changeCount: 428, importantCount: 3,
+  summary: { filesCreated: 327, filesModified: 41, filesDeleted: 6, registryCreated: 52, registryModified: 14, registryDeleted: 0, startupChanges: 1, browserChanges: 2, networkChanges: 1, userFilesModified: 3 },
+  registryChanges: [
+    { hive: 'HKCU', path: 'Software\\Microsoft\\Windows\\CurrentVersion\\Run', valueName: 'UpdateHelper', changeType: 'created', newValue: 'C:\\ProgramData\\ABC\\UpdateHelper.exe', severity: 'important' },
+    { hive: 'HKCU', path: 'Software\\Policies\\Google\\Chrome', valueName: 'HomepageLocation', changeType: 'modified', oldValue: 'https://google.com', newValue: 'https://search.abc.com', severity: 'important' },
+  ],
+  processes: [
+    { pid: 4528, parentPid: 1140, name: 'ABC_Setup.exe', executable: 'C:\\Users\\John\\Downloads\\ABC_Setup.exe', startedAt: new Date(now - 204_000).toISOString(), launchSource: 'user' },
+    { pid: 4580, parentPid: 4528, name: 'installer.exe', executable: 'C:\\Users\\John\\AppData\\Local\\Temp\\ABC\\installer.exe', startedAt: new Date(now - 198_000).toISOString(), launchSource: 'parent-process' },
+    { pid: 4624, parentPid: 4580, name: 'UpdateHelper.exe', executable: 'C:\\ProgramData\\ABC\\UpdateHelper.exe', startedAt: new Date(now - 190_000).toISOString(), launchSource: 'updater' },
+  ],
+}];
+
+export const previewRules: TraceRule[] = [
+  { id: 'rule-1', processPattern: 'UpdateHelper.exe', autoStartAction: 'block', manualStartAction: 'allow', notify: true, blockAutoRestart: true, updatedAt: new Date(now).toISOString() },
 ];

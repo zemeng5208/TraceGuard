@@ -65,7 +65,7 @@ export function ActivityChart({ settings }: { settings: AppSettings }) {
   );
 }
 
-export function InstallerPanel({ overview, settings }: { overview: Overview | null; settings: AppSettings }) {
+export function InstallerPanel({ overview, settings, onViewReports }: { overview: Overview | null; settings: AppSettings; onViewReports: () => void }) {
   const installer = overview?.activeInstaller;
   const elapsed = installer ? `${String(Math.floor(installer.elapsedSeconds / 60)).padStart(2, '0')}:${String(installer.elapsedSeconds % 60).padStart(2, '0')}` : '--:--';
   return (
@@ -75,7 +75,7 @@ export function InstallerPanel({ overview, settings }: { overview: Overview | nu
         <>
           <div className="installer-file"><span className="installer-icon"><Disc3 size={17} /></span><div><strong>{installer.name}</strong><small>PID: {installer.pid}</small></div><em>REC</em></div>
           <dl className="installer-stats"><div><dt>{isChinese(settings.locale) ? '监控时长' : 'Elapsed'}</dt><dd>{elapsed}</dd></div><div><dt>{isChinese(settings.locale) ? '检测到变化' : 'Changes'}</dt><dd>{installer.changeCount}</dd></div></dl>
-          <button type="button" className="primary-button" disabled title={isChinese(settings.locale) ? '安装报告将在 Phase 2 启用' : 'Installation reports are enabled in Phase 2'}>{text('viewReport', settings.locale)} <span>Phase 2</span></button>
+          <button type="button" className="primary-button" onClick={onViewReports}>{text('viewReport', settings.locale)} <span>{isChinese(settings.locale) ? '应用报告' : 'Applications'}</span></button>
         </>
       ) : <div className="empty-state">{isChinese(settings.locale) ? '未检测到活动安装程序' : 'No active installer detected'}</div>}
     </section>

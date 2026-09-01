@@ -8,7 +8,7 @@ const bytesRate = (value = 0) => {
   return `${value} B/s`;
 };
 
-export function DashboardPage({ overview, events, settings }: { overview: Overview | null; events: TraceEvent[]; settings: AppSettings }) {
+export function DashboardPage({ overview, events, settings, onViewReports }: { overview: Overview | null; events: TraceEvent[]; settings: AppSettings; onViewReports: () => void }) {
   return (
     <div className="dashboard-page">
       <section className="overview-section">
@@ -22,9 +22,8 @@ export function DashboardPage({ overview, events, settings }: { overview: Overvi
           <MetricCard labelKey="networkSend" value={bytesRate(overview?.networkBytesPerSecond)} detail="Live" tone="purple" sparkline={[4, 9, 6, 13, 8, 12, 6, 10]} settings={settings} />
         </div>
       </section>
-      <div className="dashboard-row dashboard-row--wide"><ActivityChart settings={settings} /><InstallerPanel overview={overview} settings={settings} /></div>
+      <div className="dashboard-row dashboard-row--wide"><ActivityChart settings={settings} /><InstallerPanel overview={overview} settings={settings} onViewReports={onViewReports} /></div>
       <div className="dashboard-row"><EventFeed events={events} settings={settings} /><ResourcePanel overview={overview} settings={settings} /></div>
     </div>
   );
 }
-

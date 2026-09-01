@@ -1,4 +1,4 @@
-const { app, BrowserWindow, globalShortcut, ipcMain, Menu, nativeImage, nativeTheme, Tray } = require('electron');
+const { app, BrowserWindow, globalShortcut, ipcMain, Menu, nativeImage, nativeTheme, Notification, Tray } = require('electron');
 const path = require('node:path');
 const { pathToFileURL } = require('node:url');
 const { CoreClient } = require('./core-client.cjs');
@@ -9,6 +9,8 @@ let core;
 let quitting = false;
 let tray;
 let runtimeSettings = { closeBehavior: 'tray', launchAtSignIn: false, startMinimized: false, startSurface: 'console', floatingWidgetEnabled: true, alwaysOnTop: true, clickThrough: false };
+const severityRank = { informational: 0, normal: 1, important: 2, critical: 3 };
+const notificationThreshold = { all: 0, important: 2, critical: 3, off: 99 };
 
 const rendererUrl = (surface) => {
   const query = surface === 'main' ? '' : `?surface=${surface}`;
@@ -61,6 +63,14 @@ function createWindow(surface = 'main') {
   return window;
 }
 
+function openMainPage(page) {
+  const main = createWindow('main');
+  const send = () => main.webContents.send('navigate', page);
+  if (main.webContents.isLoadingMainFrame()) main.webContents.once('did-finish-load', send);
+  else send();
+  return main;
+}
+
 function showBubbleMenu(window) {
   Menu.buildFromTemplate([
     { label: 'Open TraceGuard', click: () => createWindow('main') },
@@ -71,7 +81,7 @@ function showBubbleMenu(window) {
     { label: 'Collapse to Bubble', enabled: false },
     { label: 'Always on Top', type: 'checkbox', checked: window.isAlwaysOnTop(), click: (item) => window.setAlwaysOnTop(item.checked) },
     { type: 'separator' },
-    { label: 'Settings', click: () => createWindow('main').webContents.send('navigate', 'settings') },
+    { label: 'Settings', click: () => openMainPage('settings') },
     { label: 'Exit', click: () => { quitting = true; app.quit(); } },
   ]).popup({ window });
 }
@@ -87,7 +97,7 @@ function createTray() {
     { label: 'Floating Window', click: () => createWindow('widget') },
     { label: 'Floating Bubble', click: () => createWindow('bubble') },
     { type: 'separator' },
-    { label: 'Settings', click: () => { const main = createWindow('main'); main.webContents.send('navigate', 'settings'); } },
+    { label: 'Settings', click: () => openMainPage('settings') },
     { label: 'Exit', click: () => { quitting = true; app.quit(); } },
   ]));
   tray.on('double-click', () => createWindow('main'));
@@ -100,6 +110,12 @@ app.whenReady().then(() => {
   createTray();
   core.on('traceEvent', (event) => {
     for (const window of windows.values()) if (!window.isDestroyed()) window.webContents.send('trace:event', event);
+    if (event.action === 'INSTALLER_COMPLETE' && Notification.isSupported() && (severityRank[event.severity] ?? 0) >= (notificationThreshold[runtimeSettings.notificationLevel] ?? 2)) {
+      const isZh = app.getLocale().toLowerCase().startsWith('zh');
+      const notification = new Notification({ title: isZh ? event.easyMessageZh : event.easyMessage, body: event.detail, silent: !runtimeSettings.notificationSound });
+      notification.on('click', () => openMainPage('applications'));
+      notification.show();
+    }
   });
   void core.request('getSettings').then((settings) => {
     runtimeSettings = { ...runtimeSettings, ...settings };

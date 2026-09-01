@@ -9,6 +9,7 @@ import {
   HardDrive,
   Network,
   PackageOpen,
+  PackageSearch,
   Cpu,
   RotateCcw,
   ScrollText,
@@ -22,6 +23,7 @@ import type { AppSettings } from '@/types';
 export type PageId =
   | 'dashboard'
   | 'terminal'
+  | 'applications'
   | 'processes'
   | 'services'
   | 'disk'
@@ -38,6 +40,7 @@ export type PageId =
 const items: Array<{ id: PageId; key: string; icon: typeof Gauge }> = [
   { id: 'dashboard', key: 'dashboard', icon: Gauge },
   { id: 'terminal', key: 'liveTerminal', icon: ScrollText },
+  { id: 'applications', key: 'applications', icon: PackageSearch },
   { id: 'processes', key: 'processes', icon: Cpu },
   { id: 'services', key: 'services', icon: Blocks },
   { id: 'disk', key: 'disk', icon: HardDrive },
@@ -90,7 +93,7 @@ export function Sidebar({ active, onSelect, settings }: SidebarProps) {
           <ShieldCheck size={16} />
           {compact ? null : <span><b>CoreGuard</b><small>● {text('on', settings.locale)}</small></span>}
         </div>
-        {compact ? null : <div className="version-row"><span>v0.1.0</span><span>Phase 1</span></div>}
+        {compact ? null : <div className="version-row"><span>v0.2.0</span><span>Phase 2</span></div>}
       </div>
     </aside>
   );

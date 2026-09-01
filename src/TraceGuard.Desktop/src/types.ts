@@ -72,6 +72,22 @@ export interface StartupRow {
   permission: 'controllable' | 'observable' | 'protected';
 }
 
+export interface RegistryChange {
+  hive: string; path: string; valueName: string; changeType: 'created' | 'modified' | 'deleted'; oldValue?: string; newValue?: string; severity: 'normal' | 'important';
+}
+export interface SessionProcess {
+  pid: number; parentPid?: number; name: string; executable?: string; startedAt: string; endedAt?: string; launchSource: 'user' | 'parent-process' | 'startup' | 'scheduled-task' | 'service' | 'updater' | 'launcher' | 'browser' | 'unknown';
+}
+export interface ChangeSummary {
+  filesCreated: number; filesModified: number; filesDeleted: number; registryCreated: number; registryModified: number; registryDeleted: number; startupChanges: number; browserChanges: number; networkChanges: number; userFilesModified: number;
+}
+export interface InstallationSession {
+  id: string; rootProcess: string; rootPid: number; startedAt: string; endedAt?: string; status: 'recording' | 'completed'; changeCount: number; importantCount: number; summary: ChangeSummary; registryChanges: RegistryChange[]; processes?: SessionProcess[];
+}
+export interface TraceRule {
+  id: string; processPattern: string; autoStartAction: 'allow' | 'block' | 'ask'; manualStartAction: 'allow' | 'block' | 'ask'; notify: boolean; blockAutoRestart: boolean; updatedAt: string;
+}
+
 export interface AppSettings {
   schemaVersion: number;
   locale: Locale;
@@ -146,6 +162,11 @@ export interface TraceGuardApi {
   getProcesses(): Promise<ProcessRow[]>;
   getServices(): Promise<ServiceRow[]>;
   getStartupItems(): Promise<StartupRow[]>;
+  getSessions(limit?: number): Promise<InstallationSession[]>;
+  getRules(): Promise<TraceRule[]>;
+  saveRule(rule: TraceRule): Promise<TraceRule>;
+  deleteRule(id: string): Promise<ActionResult>;
+  disableStartup(name: string, source: StartupRow['source']): Promise<ActionResult>;
   getSettings(): Promise<AppSettings>;
   updateSettings(settings: AppSettings): Promise<AppSettings>;
   pauseMonitoring(): Promise<ActionResult>;

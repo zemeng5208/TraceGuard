@@ -13,6 +13,8 @@ public sealed class CoreHost : IDisposable
     private readonly SettingsStore _settingsStore;
     private readonly FileMonitor _files;
     private readonly ProcessMonitor _processes;
+    private readonly InstallationSessionTracker _sessions;
+    private readonly RuleEngine _rules;
     private readonly SystemSampler _sampler = new();
     private AppSettings _settings = new();
     private bool _monitoring;
@@ -22,13 +24,17 @@ public sealed class CoreHost : IDisposable
         _events = new EventStore(paths);
         _settingsStore = new SettingsStore(paths);
         _files = new FileMonitor(item => QueueEvent(item, publish));
-        _processes = new ProcessMonitor(item => QueueEvent(item, publish));
+        _sessions = new InstallationSessionTracker(_events, new RegistrySnapshotService(), item => QueueEvent(item, publish));
+        _rules = new RuleEngine(_events, item => QueueEvent(item, publish));
+        _processes = new ProcessMonitor(item => QueueEvent(item, publish), observation => { _sessions.OnProcess(observation); _rules.OnProcess(observation); });
     }
 
     public async Task InitializeAsync()
     {
         await _events.InitializeAsync();
         _settings = await _settingsStore.LoadAsync();
+        _sessions.RegistryMonitoringEnabled = _settings.RegistryMonitoring;
+        await _rules.InitializeAsync();
         await _events.ApplyRetentionAsync(_settings.RetentionDays);
         StartMonitoring();
     }
@@ -39,24 +45,31 @@ public sealed class CoreHost : IDisposable
         return new Overview(
             await _events.CountCategoryAsync("file"),
             await _events.CountCategoryAsync("registry"),
-            Process.GetProcesses().Length,
-            ServiceController.GetServices().Length,
+            CountProcesses(),
+            CountServices(),
             0,
             sample.NetworkBytesPerSecond,
             sample.Cpu,
             sample.Memory,
-            _monitoring);
+            _monitoring,
+            _sessions.Current is { } session ? new ActiveInstaller(session.RootProcess, session.RootPid, Math.Max(0, (int)(DateTimeOffset.UtcNow - session.StartedAt).TotalSeconds), session.ChangeCount) : null);
     }
 
     public Task<IReadOnlyList<TraceEvent>> GetEventsAsync(int limit) => _events.GetRecentAsync(limit);
     public IReadOnlyList<ProcessRow> GetProcesses() => WindowsCollectors.Processes();
     public IReadOnlyList<ServiceRow> GetServices() => WindowsCollectors.Services();
     public IReadOnlyList<StartupRow> GetStartupItems() => WindowsCollectors.StartupItems();
+    public Task<IReadOnlyList<InstallationSession>> GetSessionsAsync(int limit) => _events.GetSessionsAsync(limit);
+    public IReadOnlyList<TraceRule> GetRules() => _rules.Rules;
+    public Task<TraceRule> SaveRuleAsync(TraceRule rule) => _rules.SaveAsync(rule);
+    public async Task<ActionResult> DeleteRuleAsync(string id) { await _rules.DeleteAsync(id); return new(true, "Rule deleted.", "规则已删除。"); }
+    public ActionResult DisableStartup(string name, string source) => WindowsCollectors.DisableStartup(name, source);
     public AppSettings GetSettings() => _settings;
 
     public async Task<AppSettings> UpdateSettingsAsync(AppSettings settings)
     {
         _settings = await _settingsStore.SaveAsync(settings);
+        _sessions.RegistryMonitoringEnabled = _settings.RegistryMonitoring;
         if (_monitoring) StartMonitoring();
         await _events.ApplyRetentionAsync(_settings.RetentionDays);
         return _settings;
@@ -97,6 +110,7 @@ public sealed class CoreHost : IDisposable
 
     private void QueueEvent(TraceEvent item, Action<TraceEvent> publish)
     {
+        _sessions.OnEvent(item);
         _ = Task.Run(async () =>
         {
             try
@@ -106,6 +120,20 @@ public sealed class CoreHost : IDisposable
             }
             catch { }
         });
+    }
+
+    private static int CountProcesses()
+    {
+        var processes = Process.GetProcesses();
+        try { return processes.Length; }
+        finally { foreach (var process in processes) process.Dispose(); }
+    }
+
+    private static int CountServices()
+    {
+        var services = ServiceController.GetServices();
+        try { return services.Length; }
+        finally { foreach (var service in services) service.Dispose(); }
     }
 
     public void Dispose()

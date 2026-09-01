@@ -5,7 +5,7 @@ import type { AppSettings } from '@/types';
 import type { PageId } from '@/components/Sidebar';
 
 const pageKeys: Record<PageId, string> = {
-  dashboard: 'dashboard', terminal: 'liveTerminal', processes: 'processes', services: 'services', startup: 'startup',
+  dashboard: 'dashboard', terminal: 'liveTerminal', applications: 'applications', processes: 'processes', services: 'services', startup: 'startup',
   disk: 'disk', browser: 'browser', network: 'network', update: 'windowsUpdate', files: 'files', registry: 'registry', rules: 'rules',
   restore: 'restore', settings: 'settings',
 };

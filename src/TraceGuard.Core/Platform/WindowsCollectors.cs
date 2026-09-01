@@ -14,6 +14,7 @@ public static class WindowsCollectors
     public static IReadOnlyList<ProcessRow> Processes()
     {
         var rows = new List<ProcessRow>();
+        var parentPids = ProcessTree.GetParentPidMap();
         foreach (var process in Process.GetProcesses().OrderBy(p => p.ProcessName))
         {
             try
@@ -21,7 +22,7 @@ public static class WindowsCollectors
                 var name = process.ProcessName;
                 var path = Try(() => process.MainModule?.FileName);
                 var permission = CoreGuard.IsProtectedProcess(name) ? "protected" : CanTerminate(process.Id) ? "controllable" : "observable";
-                rows.Add(new ProcessRow(process.Id, null, name + ".exe", path, 0, Try(() => process.WorkingSet64), null, permission));
+                rows.Add(new ProcessRow(process.Id, parentPids.GetValueOrDefault(process.Id), name + ".exe", path, 0, Try(() => process.WorkingSet64), null, permission));
             }
             catch { }
             finally { process.Dispose(); }
@@ -93,6 +94,37 @@ public static class WindowsCollectors
         }
         catch (InvalidOperationException) { return Elevated(); }
         catch (Win32Exception) { return Elevated(); }
+    }
+
+    public static ActionResult DisableStartup(string name, string source)
+    {
+        try
+        {
+            if (source is "run" or "run-once")
+            {
+                var sourcePath = source == "run" ? @"Software\Microsoft\Windows\CurrentVersion\Run" : @"Software\Microsoft\Windows\CurrentVersion\RunOnce";
+                using var sourceKey = Registry.CurrentUser.OpenSubKey(sourcePath, writable: true);
+                var value = sourceKey?.GetValue(name, null, RegistryValueOptions.DoNotExpandEnvironmentNames);
+                if (value is null) return new(false, "Startup item was not found.", "未找到该启动项。");
+                using var backup = Registry.CurrentUser.CreateSubKey(@"Software\TraceGuard\DisabledStartup", writable: true);
+                backup.SetValue($"{source}|{name}", Convert.ToString(value) ?? string.Empty, RegistryValueKind.String);
+                sourceKey!.DeleteValue(name, throwOnMissingValue: false);
+                return new(true, "User startup item disabled.", "用户级启动项已禁用。");
+            }
+            if (source == "startup-folder")
+            {
+                var startup = Environment.GetFolderPath(Environment.SpecialFolder.Startup);
+                var file = Directory.EnumerateFiles(startup).FirstOrDefault(path => string.Equals(Path.GetFileNameWithoutExtension(path), name, StringComparison.OrdinalIgnoreCase));
+                if (file is null) return new(false, "Startup item was not found.", "未找到该启动项。");
+                var disabled = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "TraceGuard", "DisabledStartup");
+                Directory.CreateDirectory(disabled);
+                File.Move(file, Path.Combine(disabled, Path.GetFileName(file)), true);
+                return new(true, "User startup item disabled.", "用户级启动项已禁用。");
+            }
+            return new(false, "Observed but cannot be controlled in Zero-Privilege Mode.", "已检测到，但零提权模式下当前用户没有权限控制。");
+        }
+        catch (UnauthorizedAccessException) { return Elevated(); }
+        catch (IOException error) { return new(false, error.Message, "禁用启动项时发生文件错误。"); }
     }
 
     private static void ReadRunKey(List<StartupRow> rows, string path, string source)

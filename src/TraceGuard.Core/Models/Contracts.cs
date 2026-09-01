@@ -38,6 +38,32 @@ public sealed record ProcessRow(int Pid, int? ParentPid, string Name, string? Ex
 public sealed record ServiceRow(string Name, string DisplayName, string Status, string StartType, string? Executable, string? Publisher, string Category, string Permission);
 public sealed record StartupRow(string Name, string Command, string Source, bool Enabled, string Permission);
 
+public sealed record ProcessObservation(int Pid, int? ParentPid, string Name, string? Executable, bool Started, DateTimeOffset Timestamp);
+public sealed record RegistryChange(string Hive, string Path, string ValueName, string ChangeType, string? OldValue, string? NewValue, string Severity);
+public sealed record SessionProcess(int Pid, int? ParentPid, string Name, string? Executable, DateTimeOffset StartedAt, DateTimeOffset? EndedAt, string LaunchSource);
+public sealed record ChangeSummary(int FilesCreated, int FilesModified, int FilesDeleted, int RegistryCreated, int RegistryModified, int RegistryDeleted, int StartupChanges, int BrowserChanges, int NetworkChanges, int UserFilesModified);
+public sealed record InstallationSession(
+    string Id,
+    string RootProcess,
+    int RootPid,
+    DateTimeOffset StartedAt,
+    DateTimeOffset? EndedAt,
+    string Status,
+    int ChangeCount,
+    int ImportantCount,
+    ChangeSummary Summary,
+    IReadOnlyList<RegistryChange> RegistryChanges,
+    IReadOnlyList<SessionProcess>? Processes = null);
+
+public sealed record TraceRule(
+    string Id,
+    string ProcessPattern,
+    string AutoStartAction,
+    string ManualStartAction,
+    bool Notify,
+    bool BlockAutoRestart,
+    DateTimeOffset UpdatedAt);
+
 public sealed record AppSettings
 {
     public int SchemaVersion { get; init; } = 1;
@@ -61,7 +87,7 @@ public sealed record AppSettings
     public bool ProcessMonitoring { get; init; } = true;
     public bool ServiceMonitoring { get; init; } = true;
     public bool StartupMonitoring { get; init; } = true;
-    public bool RegistryMonitoring { get; init; }
+    public bool RegistryMonitoring { get; init; } = true;
     public bool BrowserMonitoring { get; init; }
     public bool UpdateMonitoring { get; init; } = true;
     public bool NetworkMonitoring { get; init; }

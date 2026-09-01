@@ -5,6 +5,7 @@ type Copy = { en: string; zh: string };
 export const copy: Record<string, Copy> = {
   dashboard: { en: 'Dashboard', zh: '仪表盘' },
   liveTerminal: { en: 'Live Terminal', zh: '实时终端' },
+  applications: { en: 'Applications', zh: '应用报告' },
   processes: { en: 'Processes', zh: '进程' },
   services: { en: 'Services', zh: '服务' },
   disk: { en: 'Disk', zh: '磁盘' },

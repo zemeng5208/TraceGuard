@@ -1,4 +1,4 @@
-import { Activity, Check, CircleGauge, FileClock, HardDrive, Network, X } from 'lucide-react';
+import { Activity, CircleGauge, FileClock, HardDrive, Network, X } from 'lucide-react';
 import { EventTerminal } from '@/components/EventTerminal';
 import { traceGuardApi } from '@/bridge';
 import { isChinese } from '@/i18n';
@@ -33,9 +33,4 @@ export function BubbleSurface({ overview, events, settings }: { overview: Overvi
 
 export function TerminalSurface({ events, settings }: { events: TraceEvent[]; settings: AppSettings }) {
   return <main className="floating-canvas terminal-canvas"><EventTerminal events={events} settings={settings} standalone /></main>;
-}
-
-export function InstallationToast({ settings }: { settings: AppSettings }) {
-  const isZh = isChinese(settings.locale);
-  return <section className="install-toast glass-window"><span className="complete-icon"><Check size={19} /></span><div><strong>{isZh ? '安装完成' : 'Installation Completed'}</strong><small>ABC Player</small><p>{isZh ? '共检测到 428 个系统变化' : '428 system changes'}<br /><b>{isZh ? '3 个重要变化' : '3 important changes'}</b></p><button type="button" disabled>{isZh ? 'Phase 2 启用' : 'Available in Phase 2'}</button></div></section>;
 }

@@ -5,10 +5,13 @@ import {
   previewProcesses,
   previewServices,
   previewStartup,
+  previewSessions,
+  previewRules,
 } from '@/data/preview';
-import type { AppSettings, TraceEvent, TraceGuardApi } from '@/types';
+import type { AppSettings, TraceEvent, TraceGuardApi, TraceRule } from '@/types';
 
 const STORAGE_KEY = 'traceguard-preview-settings-v1';
+let previewRuleState: TraceRule[] = previewRules.map((rule) => ({ ...rule }));
 
 const readPreviewSettings = (): AppSettings => {
   try {
@@ -26,6 +29,15 @@ const previewApi: TraceGuardApi = {
   getProcesses: async () => previewProcesses,
   getServices: async () => previewServices,
   getStartupItems: async () => previewStartup,
+  getSessions: async (limit = 100) => previewSessions.slice(0, limit),
+  getRules: async () => previewRuleState,
+  saveRule: async (rule) => {
+    const saved = { ...rule, id: rule.id || crypto.randomUUID(), updatedAt: new Date().toISOString() };
+    previewRuleState = [...previewRuleState.filter((item) => item.processPattern.toLowerCase() !== saved.processPattern.toLowerCase()), saved];
+    return saved;
+  },
+  deleteRule: async (id) => { previewRuleState = previewRuleState.filter((rule) => rule.id !== id); return { success: true }; },
+  disableStartup: async () => ({ success: false, message: 'Preview mode', messageZh: '预览模式不可修改启动项' }),
   getSettings: async () => readPreviewSettings(),
   updateSettings: async (settings) => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
