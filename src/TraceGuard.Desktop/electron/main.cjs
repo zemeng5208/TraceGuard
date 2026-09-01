@@ -16,6 +16,18 @@ let runtimeSettings = { closeBehavior: 'tray', launchAtSignIn: false, startMinim
 const severityRank = { informational: 0, normal: 1, important: 2, critical: 3 };
 const notificationThreshold = { all: 0, important: 2, critical: 3, off: 99 };
 const eventPages = { startup: 'startup', service: 'services', browser: 'browser', network: 'network', update: 'update', file: 'files', registry: 'registry', process: 'processes' };
+const nativeStrings = {
+  open: ['Open TraceGuard', '打开 TraceGuard'], terminal: ['Live Terminal', '实时终端'], pause: ['Pause Monitoring', '暂停监控'],
+  widget: ['Floating Window', '悬浮窗'], bubble: ['Floating Bubble', '悬浮球'], collapse: ['Collapse to Bubble', '收缩为悬浮球'],
+  alwaysOnTop: ['Always on Top', '始终置顶'], settings: ['Settings', '设置'], exit: ['Exit', '退出'], live: ['LIVE', '监控中'],
+};
+
+function usesChinese() {
+  if (runtimeSettings.locale === 'zh-CN') return true;
+  if (runtimeSettings.locale === 'en-US') return false;
+  return app.getLocale().toLowerCase().startsWith('zh');
+}
+function nativeText(key) { return nativeStrings[key][usesChinese() ? 1 : 0]; }
 
 function notificationEnabled(event) {
   if ((severityRank[event.severity] ?? 0) < (notificationThreshold[runtimeSettings.notificationLevel] ?? 2)) return false;
@@ -143,33 +155,38 @@ function openMainPage(page) {
 
 function showBubbleMenu(window) {
   Menu.buildFromTemplate([
-    { label: 'Open TraceGuard', click: () => createWindow('main') },
-    { label: 'Live Terminal', click: () => createWindow('terminal') },
+    { label: nativeText('open'), click: () => createWindow('main') },
+    { label: nativeText('terminal'), click: () => createWindow('terminal') },
     { type: 'separator' },
-    { label: 'Pause Monitoring', click: () => void core.request('pauseMonitoring') },
-    { label: 'Floating Window', click: () => createWindow('widget') },
-    { label: 'Collapse to Bubble', enabled: false },
-    { label: 'Always on Top', type: 'checkbox', checked: window.isAlwaysOnTop(), click: (item) => window.setAlwaysOnTop(item.checked) },
+    { label: nativeText('pause'), click: () => void core.request('pauseMonitoring') },
+    { label: nativeText('widget'), click: () => createWindow('widget') },
+    { label: nativeText('collapse'), enabled: false },
+    { label: nativeText('alwaysOnTop'), type: 'checkbox', checked: window.isAlwaysOnTop(), click: (item) => window.setAlwaysOnTop(item.checked) },
     { type: 'separator' },
-    { label: 'Settings', click: () => openMainPage('settings') },
-    { label: 'Exit', click: () => { quitting = true; app.quit(); } },
+    { label: nativeText('settings'), click: () => openMainPage('settings') },
+    { label: nativeText('exit'), click: () => { quitting = true; app.quit(); } },
   ]).popup({ window });
+}
+
+function refreshTrayMenu() {
+  if (!tray) return;
+  tray.setToolTip(`TraceGuard · ${nativeText('live')}`);
+  tray.setContextMenu(Menu.buildFromTemplate([
+    { label: nativeText('open'), click: () => createWindow('main') },
+    { label: nativeText('terminal'), click: () => createWindow('terminal') },
+    { label: nativeText('widget'), click: () => createWindow('widget') },
+    { label: nativeText('bubble'), click: () => createWindow('bubble') },
+    { type: 'separator' },
+    { label: nativeText('settings'), click: () => openMainPage('settings') },
+    { label: nativeText('exit'), click: () => { quitting = true; app.quit(); } },
+  ]));
 }
 
 function createTray() {
   if (tray) return;
   const icon = nativeImage.createFromDataURL('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQEAIAAADAAbR1AAAAIGNIUk0AAHomAACAhAAA+gAAAIDoAAB1MAAA6mAAADqYAAAXcJy6UTwAAAAGYktHRP///////wlY99wAAAAHdElNRQfqCQEEAAYgzZq5AAADIklEQVQ4y7WUfSzUcRzH3/f73Z3KIr87QnV37W7hHJWeNkqTytIkPVj0ZKMIS4XUWpu1Vhkr68lDosRwdVFpWR6nh/VgF5NzRCKGdMcxyT3pj7rG+rXWH95/ffb9vPd5fb/fz+f7ZZibCwRubpg2EdNX+qeYf83YYD74klnuS7xrAqoObTou4Dy0FnLlky2DJ1WequySIxmNFwsbcmuDy7joQTtaJnsYf14RmcvMYzlHClICc74L5Y5VTtLOY6oRQCMeMwcM+glXgDxJ2AJzbsyMBng7qK1A287mxQrn9PIERuhNfYjWVhtFd0UWoMC971O66PH70HAvhpPUW2VbDazrns8E2K+JcmALT1gG+LcLrwE+JTwKUGdqDgPzYkRrxE0RdhdeZTmAD0dIaACSPe7Z3p4dBVBz5NJsxW2gPqU/DCiMb+4HHCM4NUDfmVE7QNquNAPuUS1pgJcrTwkoS3vvAaJm8Qxnq8WjnvY+vjSAbfGR1gm9nQa1D2D4bORPbcqiYassoC6jr9i08m2v7jyQRTZkAvrtxldAV4FaBvjLDobE5tAAqAfcEc5VzelvuXRdN/Ng7gb0ocZtgKWlmQHYlew0Fzh1yt3P5BmKGksHqHdcG04Z04UVyB6mGVOD1uhCB+joGLoFSPZxBYBGM04CRUXKEwA7mjhr8uhFhrummNXGXmk2QAMgk0khHeDZpe7TgGTcOsK09/0SiRhQKL7G/J7664TYFOsctPJx+yljmigt6KwIG06dOGd1qH/h8FL8t+YWWMgACwWjYVCe6Bj0Zf2BKScozk2TpUTyAqkAgDxKcP+nNDOfWA7wLlKxgCz7GpEURNPkhhe158t8PyYq85prxDvtRgFmPen3z9I9ZDDgVGfvAXx6+iG8tbLx+vPv5Qt+ZmleMtODFc5mRVgmVWcJRBvFl50LuxLUqcDQlbESwJBvHAfIZcQgYCmaKQL4WqoUaCMVb5oq0tYm7A/tNbjq+LrUvwJ+aQXWY7PLvtW6DU1bPcLXxb3l1Fqv4nZNtqhaB7YP3CmenfYkeez9o5dxlU1Q4A2eT/Ywpvu7/gFCrB0fgiITygAAAABJRU5ErkJggg==');
   tray = new Tray(icon);
-  tray.setToolTip('TraceGuard · LIVE');
-  tray.setContextMenu(Menu.buildFromTemplate([
-    { label: 'Open TraceGuard', click: () => createWindow('main') },
-    { label: 'Live Terminal', click: () => createWindow('terminal') },
-    { label: 'Floating Window', click: () => createWindow('widget') },
-    { label: 'Floating Bubble', click: () => createWindow('bubble') },
-    { type: 'separator' },
-    { label: 'Settings', click: () => openMainPage('settings') },
-    { label: 'Exit', click: () => { quitting = true; app.quit(); } },
-  ]));
+  refreshTrayMenu();
   tray.on('double-click', () => createWindow('main'));
 }
 
@@ -202,7 +219,7 @@ app.whenReady().then(() => {
   core.on('traceEvent', (event) => {
     for (const window of windows.values()) if (!window.isDestroyed()) window.webContents.send('trace:event', event);
     if (Notification.isSupported() && notificationEnabled(event)) {
-      const isZh = app.getLocale().toLowerCase().startsWith('zh');
+      const isZh = usesChinese();
       const notification = new Notification({ title: isZh ? event.easyMessageZh : event.easyMessage, body: event.detail, silent: !runtimeSettings.notificationSound });
       notification.on('click', () => openMainPage(event.action === 'INSTALLER_COMPLETE' ? 'applications' : (eventPages[event.category] ?? 'dashboard')));
       notification.show();
@@ -210,6 +227,7 @@ app.whenReady().then(() => {
   });
   void core.request('getSettings').then((settings) => {
     runtimeSettings = { ...runtimeSettings, ...settings };
+    refreshTrayMenu();
     app.setLoginItemSettings({ openAtLogin: Boolean(settings.launchAtSignIn), args: settings.startMinimized ? ['--start-minimized'] : [] });
     if (!settings.startMinimized && settings.startSurface === 'console') createWindow('main');
     else if (settings.floatingWidgetEnabled && settings.startSurface === 'widget') createWindow('widget');
@@ -226,6 +244,7 @@ ipcMain.handle('core:request', async (_event, method, params) => {
   const result = await core.request(method, params);
   if (method === 'updateSettings' && params?.settings) {
     runtimeSettings = { ...runtimeSettings, ...params.settings };
+    refreshTrayMenu();
     app.setLoginItemSettings({ openAtLogin: Boolean(runtimeSettings.launchAtSignIn), args: runtimeSettings.startMinimized ? ['--start-minimized'] : [] });
     const widget = windows.get('widget');
     if (runtimeSettings.floatingWidgetEnabled) {
@@ -258,6 +277,7 @@ ipcMain.handle('settings:import', async () => {
     const current = await core.request('getSettings');
     const settings = await core.request('updateSettings', { settings: { ...current, ...parsed } });
     runtimeSettings = { ...runtimeSettings, ...settings };
+    refreshTrayMenu();
     return { success: true, message: 'Settings imported.', messageZh: '设置已导入。', settings };
   } catch (error) { return { success: false, message: String(error), messageZh: '导入设置失败，已保留原设置。' }; }
 });

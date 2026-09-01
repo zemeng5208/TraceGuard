@@ -18,7 +18,8 @@
 - [x] Windows CI build and packaged artifact
 - [ ] Visual browser QA and final fidelity pass (browser runtime unavailable in the current cloud environment)
 - [x] Windows CI validates .NET tests, C# publish, and renderer build
-- [ ] Windows package validation after disabling implicit CI publishing and separating installer/portable artifact names
+- [x] Windows package validation with separate per-user installer and portable artifact names
+- [x] Runtime language switching for native tray, bubble menu, tooltip, and notifications
 
 ## Phase 2 — complete
 
@@ -58,4 +59,4 @@
 
 ## Next checkpoint
 
-Validate both explicitly local-only Windows package targets in CI, then continue with zero-privilege USN/ETW capability evaluation and release packaging.
+Validate native-menu localization and packaging documentation in CI, then continue with zero-privilege USN/ETW capability evaluation and Windows runtime smoke testing.
