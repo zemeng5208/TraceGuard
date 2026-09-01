@@ -6,6 +6,8 @@ import {
 import { useDeferredValue, useMemo, useState, type CSSProperties, type ReactNode } from 'react';
 import { isChinese, secondaryText, text } from '@/i18n';
 import type { AppSettings } from '@/types';
+import { defaultSettings } from '@/data/preview';
+import { traceGuardApi } from '@/bridge';
 
 type SectionId = 'general' | 'appearance' | 'language' | 'monitoring' | 'floatingWindow' | 'floatingBubble' | 'liveTerminal' | 'notifications' | 'startupBackground' | 'privacy' | 'storage' | 'protection' | 'advanced' | 'about';
 
@@ -27,6 +29,21 @@ const sections: Array<{ id: SectionId; key: string; icon: typeof Settings2; sear
 ];
 
 const zh = (settings: AppSettings) => isChinese(settings.locale);
+const api = traceGuardApi();
+const sectionDefaults: Record<SectionId, Array<keyof AppSettings>> = {
+  general: ['launchAtSignIn', 'startMinimized', 'startSurface', 'closeBehavior', 'rememberWindowPosition', 'rememberWindowSize', 'restoreLastPage'],
+  appearance: ['theme', 'visualStyle', 'accentColor', 'useSystemAccent', 'transparency', 'density', 'fontSize', 'animation', 'sidebar', 'cornerRadius'],
+  language: ['locale'],
+  monitoring: ['fileMonitoring', 'processMonitoring', 'serviceMonitoring', 'startupMonitoring', 'registryMonitoring', 'browserMonitoring', 'updateMonitoring', 'networkMonitoring', 'fullDiskMonitoring'],
+  floatingWindow: ['floatingWidgetEnabled', 'alwaysOnTop', 'clickThrough', 'widgetOpacity', 'widgetSize', 'widgetRefreshMs', 'autoCollapse', 'edgeSnap', 'rememberWidgetPosition'],
+  floatingBubble: ['bubbleSize', 'bubbleLabel', 'showBadgeCount', 'hoverPreview', 'hoverDelayMs'],
+  liveTerminal: ['terminalMode', 'terminalAutoScroll', 'terminalTimestampMilliseconds', 'terminalMaxRows'],
+  notifications: ['notificationLevel', 'notificationSound'],
+  startupBackground: ['keepMonitoringOnClose', 'lowPowerMode', 'pauseOnBattery'],
+  privacy: ['storeFilePaths'], storage: ['retentionDays'],
+  protection: ['warnBeforeStopping', 'warnBeforeDisablingStartup', 'confirmRestore', 'confirmRuleCreation'],
+  advanced: [], about: [],
+};
 
 function SettingCard({ title, subtitle, children, className = '' }: { title: string; subtitle?: string; children: ReactNode; className?: string }) {
   return <section className={`setting-card ${className}`}><header><div><h3>{title}</h3>{subtitle ? <p>{subtitle}</p> : null}</div></header>{children}</section>;
@@ -106,7 +123,7 @@ function StandardContent({ section, settings, onChange }: SettingsContentProps &
   else if (section === 'notifications') body = <SettingCard title={isZh ? '通知级别' : 'Notification level'}><Choices value={settings.notificationLevel} options={[{ value: 'all', label: isZh ? '全部' : 'All' }, { value: 'important', label: isZh ? '仅重要' : 'Important' }, { value: 'critical', label: isZh ? '仅严重' : 'Critical' }, { value: 'off', label: text('off', settings.locale) }]} onChange={(notificationLevel) => onChange({ notificationLevel })} /><SettingRow title={isZh ? '系统通知声音' : 'System notification sound'} description={isZh ? '使用 Windows 默认声音，不附带自定义音效。' : 'Uses the Windows default sound; no bundled audio.'}><Toggle checked={settings.notificationSound} onChange={(notificationSound) => onChange({ notificationSound })} /></SettingRow></SettingCard>;
   else if (section === 'startupBackground') body = <SettingCard title={isZh ? '后台行为' : 'Background behavior'}><SettingRow title={isZh ? '关闭主窗口后继续监控' : 'Keep Monitoring When Closed'} description={isZh ? '默认开启；关闭窗口不停止核心事件采集。' : 'Enabled by default; closing the window does not stop core collection.'}><Toggle checked={settings.keepMonitoringOnClose} onChange={(keepMonitoringOnClose) => onChange({ keepMonitoringOnClose })} /></SettingRow><SettingRow title={isZh ? '低功耗模式' : 'Low Power Mode'} description={isZh ? '降低刷新率，保持核心采集。' : 'Reduces UI refresh rate while preserving core collection.'}><Toggle checked={settings.lowPowerMode} onChange={(lowPowerMode) => onChange({ lowPowerMode })} /></SettingRow></SettingCard>;
   else if (section === 'privacy') body = <><div className="privacy-banner"><ShieldCheck size={22} /><div><strong>{isZh ? '本机处理 · 无遥测' : 'Local processing · No telemetry'}</strong><span>{isZh ? 'TraceGuard 不会发送遥测，也不会读取文件正文、密码、Cookie 或浏览历史正文。' : 'TraceGuard sends no telemetry and never reads file contents, passwords, cookies, or browsing-history content.'}</span></div></div><SettingCard title={isZh ? '数据最小化' : 'Data minimization'}><SettingRow title={isZh ? '保存文件路径' : 'Store File Paths'} description={isZh ? '关闭后仅保存匿名摘要；事件解释会减少。' : 'When off, stores anonymized summaries and reduces event detail.'}><Toggle checked={settings.storeFilePaths} onChange={(storeFilePaths) => onChange({ storeFilePaths })} /></SettingRow></SettingCard></>;
-  else if (section === 'storage') body = <SettingCard title={isZh ? '事件历史' : 'Event history'}><SettingRow title={isZh ? '数据保留' : 'Retention'} description={isZh ? '过期事件在后台安全清理。' : 'Expired events are removed safely in the background.'}><Choices value={settings.retentionDays} options={[{ value: 1, label: '1D' }, { value: 7, label: '7D' }, { value: 30, label: '30D' }, { value: 90, label: '90D' }, { value: 0, label: '∞' }]} onChange={(retentionDays) => onChange({ retentionDays })} /></SettingRow><SettingRow title={isZh ? '数据库位置' : 'Database Location'} description="%LOCALAPPDATA%\TraceGuard\traceguard.db"><button className="glass-button" type="button">{isZh ? '打开文件夹' : 'Open folder'} <ChevronRight size={14} /></button></SettingRow></SettingCard>;
+  else if (section === 'storage') body = <SettingCard title={isZh ? '事件历史' : 'Event history'}><SettingRow title={isZh ? '数据保留' : 'Retention'} description={isZh ? '过期事件在后台安全清理。' : 'Expired events are removed safely in the background.'}><Choices value={settings.retentionDays} options={[{ value: 1, label: '1D' }, { value: 7, label: '7D' }, { value: 30, label: '30D' }, { value: 90, label: '90D' }, { value: 0, label: '∞' }]} onChange={(retentionDays) => onChange({ retentionDays })} /></SettingRow><SettingRow title={isZh ? '数据库位置' : 'Database Location'} description={'%LOCALAPPDATA%\\TraceGuard\\traceguard.db'}><span className="local-pill">{isZh ? '仅本机' : 'Local only'}</span></SettingRow><SettingRow title={isZh ? '清除事件历史' : 'Clear Event History'} description={isZh ? '删除 SQLite 中的事件，不影响设置和规则。' : 'Deletes SQLite events without changing settings or rules.'}><button className="danger-button" type="button" onClick={() => { if (window.confirm(isZh ? '确定清除全部事件历史？此操作无法撤销。' : 'Clear all event history? This cannot be undone.')) void api.clearEvents(); }}>{isZh ? '清除历史' : 'Clear history'}</button></SettingRow></SettingCard>;
   else if (section === 'protection') body = <><div className="coreguard-banner"><ShieldCheck size={25} /><div><strong>CoreGuard</strong><span>{isZh ? '防止 TraceGuard 对关键 Windows 核心组件执行危险操作。此保护不可关闭。' : 'Protects critical Windows components from destructive TraceGuard actions. It cannot be disabled.'}</span></div><span className="locked-pill">{isZh ? '始终开启' : 'Always on'}</span></div><SettingCard title={isZh ? '操作确认' : 'Action confirmations'}><SettingRow title={isZh ? '停止进程前警告' : 'Warn Before Stopping Process'} description={isZh ? '对允许控制的普通进程显示确认。' : 'Confirms actions on controllable standard processes.'}><Toggle checked={settings.warnBeforeStopping} onChange={(warnBeforeStopping) => onChange({ warnBeforeStopping })} /></SettingRow><SettingRow title={isZh ? '恢复操作确认' : 'Confirm Restore Operations'} description={isZh ? '在修改用户级配置前请求确认。' : 'Confirms before changing user-level configuration.'}><Toggle checked={settings.confirmRestore} onChange={(confirmRestore) => onChange({ confirmRestore })} /></SettingRow></SettingCard></>;
   else if (section === 'advanced') body = <><div className="advanced-warning"><Bot size={21} /><span>{isZh ? '高级设置可能影响 TraceGuard 的行为，建议普通用户保持默认值。' : 'Advanced settings can change TraceGuard behavior. Default values are recommended.'}</span></div><SettingCard title={isZh ? '开发功能' : 'Developer features'}><SettingRow title={isZh ? 'USN Journal / ETW 设置' : 'USN Journal / ETW settings'} description={isZh ? '相关能力完成后才会显示，当前不可用。' : 'Shown only when the capabilities are implemented; currently unavailable.'} locked><button className="glass-button" type="button" disabled>{isZh ? '尚未实现' : 'Not implemented'}</button></SettingRow></SettingCard></>;
   else body = <SettingCard title="TraceGuard 0.1.0"><div className="about-mark"><span className="brand-shield">TG</span><div><strong>See what changed.</strong><span>Understand why. Control what you own.</span><small>Windows 10 / 11 · Zero-Privilege · Local First</small></div></div></SettingCard>;
@@ -118,12 +135,23 @@ export function SettingsPage({ settings, onChange }: SettingsContentProps) {
   const [query, setQuery] = useState('');
   const deferred = useDeferredValue(query.trim().toLowerCase());
   const visibleSections = useMemo(() => sections.filter((item) => !deferred || `${item.search} ${text(item.key, settings.locale)} ${secondaryText(item.key, settings.locale)}`.toLowerCase().includes(deferred)), [deferred, settings.locale]);
+  const restoreSection = () => {
+    const patch: Partial<AppSettings> = {};
+    for (const key of sectionDefaults[section]) (patch as Record<string, unknown>)[key] = defaultSettings[key];
+    onChange(patch);
+  };
   return <div className="settings-page">
     <aside className="settings-sidebar panel">
       <label className="settings-search"><Search size={15} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={text('searchSettings', settings.locale)} /></label>
       <nav>{visibleSections.map((item) => { const Icon = item.icon; return <button type="button" key={item.id} className={section === item.id ? 'is-active' : ''} onClick={() => setSection(item.id)}><Icon size={16} /><span><strong>{text(item.key, settings.locale)}</strong><small>{secondaryText(item.key, settings.locale)}</small></span></button>; })}</nav>
       <div className="settings-safe"><ShieldCheck size={16} /><span><strong>Zero-Privilege</strong><small>{zh(settings) ? '所有设置均不请求提权' : 'Settings never request elevation'}</small></span></div>
     </aside>
-    <div className="settings-content">{section === 'appearance' ? <Appearance settings={settings} onChange={onChange} /> : <StandardContent section={section} settings={settings} onChange={onChange} />}</div>
+    <div className="settings-content">
+      {section === 'appearance' ? <Appearance settings={settings} onChange={onChange} /> : <StandardContent section={section} settings={settings} onChange={onChange} />}
+      <footer className="settings-reset">
+        <button type="button" disabled={sectionDefaults[section].length === 0} onClick={restoreSection}>{isChinese(settings.locale) ? '恢复此分类默认值' : 'Restore category defaults'}</button>
+        <button type="button" onClick={() => { if (window.confirm(isChinese(settings.locale) ? '重置全部设置？事件历史、规则和报告不会被删除。' : 'Reset all settings? Event history, rules, and reports will not be deleted.')) onChange(defaultSettings); }}>{isChinese(settings.locale) ? '重置全部设置' : 'Reset all settings'}</button>
+      </footer>
+    </div>
   </div>;
 }
