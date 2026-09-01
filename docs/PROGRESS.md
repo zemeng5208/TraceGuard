@@ -22,6 +22,7 @@
 - [x] Runtime language switching for native tray, bubble menu, tooltip, and notifications
 - [x] Published-core IPC smoke test running as the ordinary Windows CI user
 - [x] Duplicate startup/scheduled-task rows are deterministically de-duplicated without hiding distinct commands
+- [x] Release artifact structure, PE headers, minimum sizes, and SHA-256 checksums are validated in CI
 
 ## Phase 2 — complete
 

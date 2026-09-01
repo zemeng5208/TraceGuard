@@ -75,7 +75,7 @@ The Windows CI also starts the published core as the runner's ordinary user and 
 
 TraceGuard does not request administrator permission. Some system services, protected processes, and machine-level configuration can therefore be observed but cannot be controlled. This is expected behavior under the Windows security model.
 
-The Windows build produces two per-user artifacts: `TraceGuard-Setup-<version>-x64.exe` and `TraceGuard-Portable-<version>-x64.exe`. Packaging is explicitly local-only (`--publish never`); creating a package never uploads application data or release files.
+The Windows build produces two per-user artifacts: `TraceGuard-Setup-<version>-x64.exe` and `TraceGuard-Portable-<version>-x64.exe`, plus `SHA256SUMS.txt` for integrity checks. CI rejects missing, duplicate, undersized, or non-PE artifacts. Packaging is explicitly local-only (`--publish never`); creating a package never uploads application data or release files.
 
 File monitoring currently uses Windows `FileSystemWatcher` and records metadata within the current user's accessible scope. Installer reports associate those events with an installer session by time window; this is explicitly labeled as best-effort and is not presented as exact process attribution. TraceGuard safely probes whether the current user can query each NTFS USN Journal, but journal event reading and ETW attribution are not yet enabled and no fake settings are exposed for them. The probe never creates or modifies a journal. Disk activity aggregates I/O counters from processes readable by the current user, so elevated or protected-process activity can remain unaccounted for. The UI labels this boundary instead of inventing a value.
 

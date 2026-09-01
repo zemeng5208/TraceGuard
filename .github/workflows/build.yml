@@ -29,8 +29,13 @@ jobs:
         run: ./scripts/smoke-core.ps1 -Executable ./src/TraceGuard.Core/bin/Release/net8.0-windows10.0.19041.0/win-x64/publish/TraceGuard.Core.exe
       - run: npm run build
       - run: npm run package:win
+      - name: Verify Windows package contents
+        shell: pwsh
+        run: ./scripts/verify-package.ps1
       - uses: actions/upload-artifact@v4
         with:
           name: TraceGuard-windows-x64
-          path: release/TraceGuard-*.exe
+          path: |
+            release/TraceGuard-*.exe
+            release/SHA256SUMS.txt
           if-no-files-found: error
