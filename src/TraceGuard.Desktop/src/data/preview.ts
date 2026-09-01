@@ -1,0 +1,128 @@
+import type { AppSettings, Overview, ProcessRow, ServiceRow, StartupRow, TraceEvent } from '@/types';
+
+export const defaultSettings: AppSettings = {
+  schemaVersion: 1,
+  locale: 'zh-CN',
+  theme: 'dark',
+  visualStyle: 'acrylic',
+  accentColor: '#4c97ff',
+  useSystemAccent: true,
+  transparency: 20,
+  density: 'comfortable',
+  fontSize: 'default',
+  animation: 'full',
+  sidebar: 'expanded',
+  startMinimized: false,
+  startSurface: 'console',
+  closeBehavior: 'tray',
+  rememberWindowPosition: true,
+  rememberWindowSize: true,
+  restoreLastPage: true,
+  fileMonitoring: true,
+  processMonitoring: true,
+  serviceMonitoring: true,
+  startupMonitoring: true,
+  registryMonitoring: false,
+  browserMonitoring: false,
+  updateMonitoring: true,
+  networkMonitoring: false,
+  fullDiskMonitoring: false,
+  floatingWidgetEnabled: true,
+  alwaysOnTop: true,
+  clickThrough: false,
+  widgetOpacity: 92,
+  widgetSize: 'standard',
+  widgetRefreshMs: 1000,
+  autoCollapse: false,
+  edgeSnap: true,
+  rememberWidgetPosition: true,
+  bubbleSize: 'medium',
+  bubbleLabel: 'tg',
+  showBadgeCount: true,
+  hoverPreview: true,
+  hoverDelayMs: 500,
+  terminalMode: 'easy',
+  terminalAutoScroll: true,
+  terminalTimestampMilliseconds: false,
+  terminalMaxRows: 1000,
+  notificationLevel: 'important',
+  notificationSound: true,
+  launchAtSignIn: false,
+  keepMonitoringOnClose: true,
+  lowPowerMode: false,
+  storeFilePaths: true,
+  retentionDays: 30,
+  warnBeforeStopping: true,
+  warnBeforeDisablingStartup: true,
+  confirmRestore: true,
+  confirmRuleCreation: true,
+  cornerRadius: 'rounded',
+  pauseOnBattery: false,
+};
+
+export const previewOverview: Overview = {
+  fileChanges: 1246,
+  registryChanges: 342,
+  processCount: 128,
+  serviceCount: 214,
+  diskBytesPerSecond: 3.2 * 1024 * 1024,
+  networkBytesPerSecond: 1.8 * 1024 * 1024,
+  cpuPercent: 23,
+  memoryPercent: 45,
+  monitoring: true,
+  activeInstaller: { name: 'ABC_Setup.exe', pid: 4528, elapsedSeconds: 204, changeCount: 428 },
+};
+
+const now = Date.now();
+const event = (
+  id: number,
+  offsetSeconds: number,
+  category: TraceEvent['category'],
+  action: string,
+  easyMessageZh: string,
+  easyMessage: string,
+  detail: string,
+  processName?: string,
+  severity: TraceEvent['severity'] = 'normal',
+): TraceEvent => ({
+  id,
+  timestamp: new Date(now - offsetSeconds * 1000).toISOString(),
+  category,
+  action,
+  easyMessage,
+  easyMessageZh,
+  detail,
+  processName,
+  severity,
+});
+
+export const previewEvents: TraceEvent[] = [
+  event(9, 2, 'file', 'CREATE', '创建了程序文件', 'A program file was created', 'C:\\ProgramData\\ABC\\Updater.exe', 'ABC_Setup.exe'),
+  event(8, 3, 'registry', 'MODIFY', '新增登录自启动项', 'A sign-in startup item was added', 'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Run', 'UpdateHelper.exe', 'important'),
+  event(7, 5, 'service', 'CREATED', '检测到新服务', 'A new service was detected', 'ABC Update Service', 'ABC_Setup.exe', 'important'),
+  event(6, 7, 'process', 'START', '后台更新程序已启动', 'Background updater started', 'UpdateHelper.exe (PID: 4528)', 'UpdateHelper.exe'),
+  event(5, 9, 'file', 'MODIFY', '修改了用户配置文件', 'A user configuration file was modified', 'C:\\Users\\John\\AppData\\Roaming\\ABC\\config.json', 'Updater.exe'),
+  event(4, 11, 'browser', 'MODIFY', 'Chrome 浏览器主页发生变化', 'Chrome homepage was changed', 'Google → ABC Search', 'chrome.exe', 'critical'),
+  event(3, 13, 'startup', 'ADD', '程序被添加到登录启动', 'Program was added to sign-in startup', 'UpdateHelper.exe', 'ABC_Setup.exe', 'important'),
+  event(2, 15, 'network', 'CONNECT', '程序建立了网络连接', 'A program opened a network connection', 'update.abc.com:443', 'UpdateHelper.exe'),
+  event(1, 17, 'file', 'CREATE', '创建了配置文件', 'A configuration file was created', 'C:\\Users\\John\\AppData\\Local\\ABC\\config.json', 'ABC_Setup.exe'),
+];
+
+export const previewProcesses: ProcessRow[] = [
+  { pid: 4528, parentPid: 4100, name: 'UpdateHelper.exe', executable: 'C:\\ProgramData\\ABC\\UpdateHelper.exe', cpuPercent: 3.2, memoryBytes: 82_231_296, publisher: 'ABC Software', permission: 'controllable' },
+  { pid: 1140, parentPid: 832, name: 'explorer.exe', executable: 'C:\\Windows\\explorer.exe', cpuPercent: 1.1, memoryBytes: 196_083_712, publisher: 'Microsoft Corporation', permission: 'controllable' },
+  { pid: 744, parentPid: 632, name: 'services.exe', executable: 'C:\\Windows\\System32\\services.exe', cpuPercent: 0.2, memoryBytes: 12_582_912, publisher: 'Microsoft Corporation', permission: 'protected' },
+  { pid: 820, parentPid: 744, name: 'svchost.exe', executable: 'C:\\Windows\\System32\\svchost.exe', cpuPercent: 0.8, memoryBytes: 38_797_312, publisher: 'Microsoft Corporation', permission: 'observable' },
+];
+
+export const previewServices: ServiceRow[] = [
+  { name: 'ABCUpdate', displayName: 'ABC Update Service', status: 'Running', startType: 'Automatic', executable: 'C:\\ProgramData\\ABC\\ABCUpdate.exe', publisher: 'ABC Software', category: 'third-party', permission: 'observable' },
+  { name: 'wuauserv', displayName: 'Windows Update', status: 'Running', startType: 'Manual', executable: 'C:\\Windows\\system32\\svchost.exe', publisher: 'Microsoft Corporation', category: 'windows-core', permission: 'protected' },
+  { name: 'Spooler', displayName: 'Print Spooler', status: 'Running', startType: 'Automatic', executable: 'C:\\Windows\\System32\\spoolsv.exe', publisher: 'Microsoft Corporation', category: 'windows-optional', permission: 'observable' },
+];
+
+export const previewStartup: StartupRow[] = [
+  { name: 'UpdateHelper', command: 'C:\\ProgramData\\ABC\\UpdateHelper.exe --background', source: 'run', enabled: true, permission: 'controllable' },
+  { name: 'OneDrive', command: 'C:\\Users\\John\\AppData\\Local\\Microsoft\\OneDrive\\OneDrive.exe /background', source: 'run', enabled: true, permission: 'controllable' },
+  { name: 'SecurityHealth', command: '%windir%\\system32\\SecurityHealthSystray.exe', source: 'run', enabled: true, permission: 'protected' },
+];

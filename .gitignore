@@ -1,0 +1,14 @@
+node_modules/
+dist/
+release/
+*.log
+.vs/
+.vscode/
+bin/
+obj/
+TestResults/
+coverage/
+*.user
+*.suo
+.DS_Store
+
