@@ -1,5 +1,11 @@
 # Development progress
 
+## Release status
+
+`0.2.0` is version-normalized and its x64 Setup/Portable artifacts pass the automated Windows build, launch, Core IPC, per-user install, uninstall, PE-structure, and SHA-256 checks. It remains a **pre-release candidate** until the Windows 10/11 consumer-hardware matrix and final packaged visual review are complete; no stable GitHub Release has been published.
+
+`0.2.0` 已完成版本统一，x64 安装包与 Portable 包已通过自动化 Windows 构建、启动、Core IPC、当前用户安装/卸载、PE 结构和 SHA-256 校验。目前仍是 **预发布候选版本**；Windows 10/11 消费级实机矩阵与最终成品视觉复核完成前，不视为稳定正式版。
+
 ## Phase 1 MVP — complete
 
 - [x] Electron + React + TypeScript desktop shell
@@ -61,12 +67,14 @@
 - [x] Remove hard-coded disk/network percentages and sample telemetry from production UI
 - [x] Probe zero-privilege USN Journal readability per NTFS volume without creating or modifying journals
 - [x] Incrementally read new USN v2 records on eligible volumes, resolve paths by file ID where accessible, and fall back per-volume without elevation
-- [ ] Correlate USN changes with the exact originating process (currently reported as best-effort installer-session attribution)
+- [x] Supplement primary file events with exact-path PID/process attribution when the current token is already eligible for the bounded user-mode ETW session
+- [ ] Expand exact originating-process coverage beyond eligible ETW exact-path matches (unmatched USN/Watcher events remain best-effort by design)
 - [x] Evaluate current-token eligibility for user-session ETW control without requiring elevation
 - [x] Enable only the process/file manifest providers for eligible current tokens and correlate exact-path metadata events with PID/process identity
 - [ ] Complete Windows 10/11 hardware compatibility testing (automated Windows runner coverage is complete)
-- [ ] Normalize release version and publish the first verified package
+- [x] Normalize renderer, package, About page, and .NET assembly versions to `0.2.0`
+- [ ] Publish the first verified `0.2.0` pre-release package
 
 ## Next checkpoint
 
-Capture and visually review the packaged Windows Dashboard, then complete the release workflow and documented Windows 10/11 compatibility matrix.
+Complete the packaged light/dark visual review and document results from Windows 10/11 consumer-hardware tests, then publish the verified `0.2.0` pre-release package.

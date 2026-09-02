@@ -1,0 +1,242 @@
+name: Release TraceGuard
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+concurrency:
+  group: traceguard-release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build and verify Windows release
+    runs-on: windows-latest
+    permissions:
+      contents: read
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      artifact_name: ${{ steps.version.outputs.artifact_name }}
+    steps:
+      - name: Check out tagged source
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Validate tag, versions, release notes, and main ancestry
+        id: version
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $tag = $env:GITHUB_REF_NAME
+          if ($tag -notmatch '^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$') {
+            throw "Release tag must use the strict vX.Y.Z format: $tag"
+          }
+
+          $version = $tag.Substring(1)
+          $package = Get-Content -LiteralPath ./package.json -Raw | ConvertFrom-Json -AsHashtable
+          $lock = Get-Content -LiteralPath ./package-lock.json -Raw | ConvertFrom-Json -AsHashtable
+          $project = [xml](Get-Content -LiteralPath ./src/TraceGuard.Core/TraceGuard.Core.csproj -Raw)
+          $coreVersion = [string]$project.Project.PropertyGroup.Version
+          $assemblyVersion = [string]$project.Project.PropertyGroup.AssemblyVersion
+          $fileVersion = [string]$project.Project.PropertyGroup.FileVersion
+
+          $versions = [ordered]@{
+            'package.json' = [string]$package.version
+            'package-lock.json' = [string]$lock.version
+            'package-lock.json root package' = [string]$lock.packages[''].version
+            'TraceGuard.Core.csproj' = $coreVersion
+          }
+          foreach ($entry in $versions.GetEnumerator()) {
+            if ($entry.Value -ne $version) {
+              throw "Version mismatch: tag=$version, $($entry.Key)=$($entry.Value)"
+            }
+          }
+          if ($assemblyVersion -ne "$version.0" -or $fileVersion -ne "$version.0") {
+            throw "Core assembly/file version mismatch: expected $version.0, AssemblyVersion=$assemblyVersion, FileVersion=$fileVersion"
+          }
+
+          $releaseNotes = "./docs/releases/$tag.md"
+          if (-not (Test-Path -LiteralPath $releaseNotes -PathType Leaf)) {
+            throw "Release notes are required at $releaseNotes"
+          }
+          if ((Get-Item -LiteralPath $releaseNotes).Length -eq 0) {
+            throw "Release notes must not be empty: $releaseNotes"
+          }
+
+          git fetch origin main:refs/remotes/origin/main --force
+          if ($LASTEXITCODE -ne 0) { throw 'Could not fetch origin/main for release ancestry validation.' }
+          $tagCommit = (git rev-parse "$($tag)^{commit}").Trim()
+          $headCommit = (git rev-parse HEAD).Trim()
+          if ($LASTEXITCODE -ne 0 -or $tagCommit -ne $headCommit) {
+            throw "The checked-out commit does not match $tag."
+          }
+          git merge-base --is-ancestor HEAD refs/remotes/origin/main
+          if ($LASTEXITCODE -ne 0) {
+            throw "Tag $tag does not point to a commit contained in main."
+          }
+
+          "version=$version" >> $env:GITHUB_OUTPUT
+          "artifact_name=TraceGuard-$version-windows-x64" >> $env:GITHUB_OUTPUT
+          Write-Host "Validated release $tag at $headCommit"
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install JavaScript dependencies
+        run: npm ci
+
+      - name: Test C# Core
+        run: dotnet test TraceGuard.sln --configuration Release
+
+      - name: Validate Electron entry points
+        shell: pwsh
+        run: |
+          node --check ./src/TraceGuard.Desktop/electron/main.cjs
+          node --check ./src/TraceGuard.Desktop/electron/preload.cjs
+          node --check ./src/TraceGuard.Desktop/electron/core-client.cjs
+
+      - name: Build desktop renderer
+        run: npm run build
+
+      - name: Publish self-contained C# Core
+        run: dotnet publish src/TraceGuard.Core/TraceGuard.Core.csproj --configuration Release --runtime win-x64 --self-contained true
+
+      - name: Smoke-test zero-privilege Core IPC
+        shell: pwsh
+        run: ./scripts/smoke-core.ps1 -Executable ./src/TraceGuard.Core/bin/Release/net8.0-windows10.0.19041.0/win-x64/publish/TraceGuard.Core.exe
+
+      - name: Package per-user Setup and Portable executables
+        run: npm run package:win
+
+      - name: Smoke-test packaged desktop
+        shell: pwsh
+        run: ./scripts/smoke-desktop.ps1
+
+      - name: Smoke-test Portable executable
+        shell: pwsh
+        run: ./scripts/smoke-portable.ps1
+
+      - name: Smoke-test per-user install and uninstall
+        shell: pwsh
+        run: ./scripts/smoke-installer.ps1
+
+      - name: Verify package contents and write SHA-256 manifest
+        shell: pwsh
+        run: ./scripts/verify-package.ps1
+
+      - name: Verify SHA-256 manifest
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $version = '${{ steps.version.outputs.version }}'
+          $expected = @(
+            "TraceGuard-Setup-$version-x64.exe",
+            "TraceGuard-Portable-$version-x64.exe"
+          )
+          $lines = @(Get-Content -LiteralPath ./release/SHA256SUMS.txt | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
+          if ($lines.Count -ne $expected.Count) { throw "Expected $($expected.Count) checksum entries, found $($lines.Count)." }
+
+          $seen = @{}
+          foreach ($line in $lines) {
+            if ($line -notmatch '^([0-9a-fA-F]{64})\s{2}(.+)$') { throw "Invalid SHA256SUMS entry: $line" }
+            $expectedHash = $Matches[1].ToLowerInvariant()
+            $name = $Matches[2]
+            if ($name -notin $expected) { throw "Unexpected checksum target: $name" }
+            if ($seen.ContainsKey($name)) { throw "Duplicate checksum target: $name" }
+            $seen[$name] = $true
+            $actualHash = (Get-FileHash -LiteralPath (Join-Path ./release $name) -Algorithm SHA256).Hash.ToLowerInvariant()
+            if ($actualHash -ne $expectedHash) { throw "SHA-256 mismatch for $name" }
+          }
+          foreach ($name in $expected) {
+            if (-not $seen.ContainsKey($name)) { throw "Missing checksum target: $name" }
+          }
+
+      - name: Upload verified release payload
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.version.outputs.artifact_name }}
+          path: |
+            release/TraceGuard-Setup-${{ steps.version.outputs.version }}-x64.exe
+            release/TraceGuard-Portable-${{ steps.version.outputs.version }}-x64.exe
+            release/SHA256SUMS.txt
+          if-no-files-found: error
+          retention-days: 7
+
+  release:
+    name: Create GitHub prerelease
+    needs: build
+    runs-on: windows-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Check out tagged release notes
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Download verified release payload
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ needs.build.outputs.artifact_name }}
+          path: release
+
+      - name: Reverify downloaded SHA-256 manifest
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $version = '${{ needs.build.outputs.version }}'
+          $expected = @(
+            "TraceGuard-Setup-$version-x64.exe",
+            "TraceGuard-Portable-$version-x64.exe"
+          )
+          $lines = @(Get-Content -LiteralPath ./release/SHA256SUMS.txt | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
+          if ($lines.Count -ne $expected.Count) { throw "Expected $($expected.Count) checksum entries, found $($lines.Count)." }
+
+          $seen = @{}
+          foreach ($line in $lines) {
+            if ($line -notmatch '^([0-9a-fA-F]{64})\s{2}(.+)$') { throw "Invalid SHA256SUMS entry: $line" }
+            $expectedHash = $Matches[1].ToLowerInvariant()
+            $name = $Matches[2]
+            if ($name -notin $expected) { throw "Unexpected checksum target: $name" }
+            if ($seen.ContainsKey($name)) { throw "Duplicate checksum target: $name" }
+            $seen[$name] = $true
+            $actualHash = (Get-FileHash -LiteralPath (Join-Path ./release $name) -Algorithm SHA256).Hash.ToLowerInvariant()
+            if ($actualHash -ne $expectedHash) { throw "SHA-256 mismatch for $name" }
+          }
+          foreach ($name in $expected) {
+            if (-not $seen.ContainsKey($name)) { throw "Missing checksum target: $name" }
+          }
+
+      - name: Create prerelease and upload verified files
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $tag = $env:GITHUB_REF_NAME
+          $version = '${{ needs.build.outputs.version }}'
+          $notes = "./docs/releases/$tag.md"
+          if (-not (Test-Path -LiteralPath $notes -PathType Leaf)) { throw "Release notes are missing: $notes" }
+
+          gh release create $tag `
+            "./release/TraceGuard-Setup-$version-x64.exe" `
+            "./release/TraceGuard-Portable-$version-x64.exe" `
+            './release/SHA256SUMS.txt' `
+            --repo $env:GITHUB_REPOSITORY `
+            --target $env:GITHUB_SHA `
+            --title "TraceGuard $tag" `
+            --notes-file $notes `
+            --prerelease `
+            --verify-tag

@@ -3,6 +3,7 @@ using System.ServiceProcess;
 using TraceGuard.Core.Models;
 using TraceGuard.Core.Monitoring;
 using TraceGuard.Core.Platform;
+using TraceGuard.Core.Protection;
 using TraceGuard.Core.Storage;
 
 namespace TraceGuard.Core;
@@ -24,12 +25,18 @@ public sealed class CoreHost : IDisposable
     private bool _monitoring;
     private bool _monitoringRequested = true;
     private bool _batteryLimited;
+    private readonly bool _privilegeBlocked;
 
-    public CoreHost(AppPaths paths, Action<TraceEvent> publish)
+    public CoreHost(AppPaths paths, Action<TraceEvent> publish) : this(paths, publish, ExecutionPrivilegeGuard.IsBlocked)
     {
+    }
+
+    internal CoreHost(AppPaths paths, Action<TraceEvent> publish, bool privilegeBlocked)
+    {
+        _privilegeBlocked = privilegeBlocked;
         _events = new EventStore(paths);
         _settingsStore = new SettingsStore(paths);
-        _files = new FileMonitor(item => QueueEvent(item, publish));
+        _files = new FileMonitor(item => QueueEvent(item, publish), MonitoringPathExclusions.ForAppPaths(paths));
         _sessions = new InstallationSessionTracker(_events, new RegistrySnapshotService(), item => QueueEvent(item, publish));
         _rules = new RuleEngine(_events, item => QueueEvent(item, publish));
         _configurations = new ConfigurationMonitor(item => QueueEvent(item, publish));
@@ -42,14 +49,19 @@ public sealed class CoreHost : IDisposable
         _settings = await _settingsStore.LoadAsync();
         _sessions.RegistryMonitoringEnabled = _settings.RegistryMonitoring;
         await _rules.InitializeAsync();
-        await _events.ApplyRetentionAsync(_settings.RetentionDays);
-        StartMonitoring();
-        _powerTimer = new Timer(_ => RefreshPowerMode(), null, TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(5));
+        if (!_privilegeBlocked) await _events.ApplyRetentionAsync(_settings.RetentionDays);
+        if (!_privilegeBlocked)
+        {
+            StartMonitoring();
+            _powerTimer = new Timer(_ => RefreshPowerMode(), null, TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(5));
+        }
     }
 
     public async Task<Overview> GetOverviewAsync()
     {
-        var sample = _sampler.Sample();
+        var sample = _privilegeBlocked
+            ? (Cpu: 0d, Memory: 0d, NetworkBytesPerSecond: 0L, IoBytesPerSecond: 0L)
+            : _sampler.Sample();
         var since = DateTimeOffset.UtcNow.AddMinutes(-1);
         var fileChanges = _events.CountCategoryAsync("file");
         var registryChanges = _events.CountCategoryAsync("registry");
@@ -60,35 +72,39 @@ public sealed class CoreHost : IDisposable
             await registryChanges,
             await fileRate,
             await registryRate,
-            CountProcesses(),
-            CountServices(),
+            _privilegeBlocked ? 0 : CountProcesses(),
+            _privilegeBlocked ? 0 : CountServices(),
             sample.IoBytesPerSecond,
             sample.NetworkBytesPerSecond,
             sample.Cpu,
             sample.Memory,
             _monitoring,
-            !_monitoringRequested ? "paused" : _batteryLimited || _settings.LowPowerMode ? "reduced" : "active",
-            PowerStatus.IsOnBattery(),
+            _privilegeBlocked ? "privilege-blocked" : !_monitoringRequested ? "paused" : _batteryLimited || _settings.LowPowerMode ? "reduced" : "active",
+            !_privilegeBlocked && PowerStatus.IsOnBattery(),
             GetMonitorModules(),
             _sessions.Current is { } session ? new ActiveInstaller(session.RootProcess, session.RootPid, Math.Max(0, (int)(DateTimeOffset.UtcNow - session.StartedAt).TotalSeconds), session.ChangeCount) : null);
     }
 
     public Task<IReadOnlyList<TraceEvent>> GetEventsAsync(int limit) => _events.GetRecentAsync(limit);
-    public IReadOnlyList<ProcessRow> GetProcesses() => WindowsCollectors.Processes();
-    public IReadOnlyList<ServiceRow> GetServices() => WindowsCollectors.Services();
-    public IReadOnlyList<StartupRow> GetStartupItems() => WindowsCollectors.StartupItems();
-    public IReadOnlyList<RestoreItem> GetRestoreItems() => WindowsCollectors.RestoreItems();
-    public IReadOnlyList<ConfigurationItem> GetBrowserItems() => SystemConfigurationCollectors.BrowserItems();
-    public IReadOnlyList<ConfigurationItem> GetNetworkItems() => SystemConfigurationCollectors.NetworkItems();
-    public IReadOnlyList<ConfigurationItem> GetWindowsUpdateItems() => SystemConfigurationCollectors.WindowsUpdateItems();
-    public IReadOnlyList<ConfigurationItem> GetFileAssociationItems() => SystemConfigurationCollectors.FileAssociationItems();
+    public IReadOnlyList<ProcessRow> GetProcesses() => _privilegeBlocked ? [] : WindowsCollectors.Processes();
+    public IReadOnlyList<ServiceRow> GetServices() => _privilegeBlocked ? [] : WindowsCollectors.Services();
+    public IReadOnlyList<StartupRow> GetStartupItems() => _privilegeBlocked ? [] : WindowsCollectors.StartupItems();
+    public IReadOnlyList<RestoreItem> GetRestoreItems() => _privilegeBlocked ? [] : WindowsCollectors.RestoreItems();
+    public IReadOnlyList<ConfigurationItem> GetBrowserItems() => _privilegeBlocked ? [] : SystemConfigurationCollectors.BrowserItems();
+    public IReadOnlyList<ConfigurationItem> GetNetworkItems() => _privilegeBlocked ? [] : SystemConfigurationCollectors.NetworkItems();
+    public IReadOnlyList<ConfigurationItem> GetWindowsUpdateItems() => _privilegeBlocked ? [] : SystemConfigurationCollectors.WindowsUpdateItems();
+    public IReadOnlyList<ConfigurationItem> GetFileAssociationItems() => _privilegeBlocked ? [] : SystemConfigurationCollectors.FileAssociationItems();
     public Task<IReadOnlyList<InstallationSession>> GetSessionsAsync(int limit) => _events.GetSessionsAsync(limit);
     public Task<StorageInfo> GetStorageInfoAsync() => _events.GetStorageInfoAsync();
     public IReadOnlyList<TraceRule> GetRules() => _rules.Rules;
-    public Task<TraceRule> SaveRuleAsync(TraceRule rule) => _rules.SaveAsync(rule);
-    public async Task<ActionResult> DeleteRuleAsync(string id) { await _rules.DeleteAsync(id); return new(true, "Rule deleted.", "规则已删除。"); }
-    public ActionResult DisableStartup(string name, string source) => WindowsCollectors.DisableStartup(name, source);
-    public ActionResult RestoreStartup(string id) => WindowsCollectors.RestoreStartup(id);
+    public Task<TraceRule> SaveRuleAsync(TraceRule rule) => _privilegeBlocked
+        ? Task.FromException<TraceRule>(CoreGuard.ElevatedExecutionException())
+        : _rules.SaveAsync(rule);
+    public async Task<ActionResult> DeleteRuleAsync(string id) { if (_privilegeBlocked) return CoreGuard.ElevatedExecutionDenied(); await _rules.DeleteAsync(id); return new(true, "Rule deleted.", "规则已删除。"); }
+    public ActionResult DisableStartup(string name, string source) => _privilegeBlocked ? CoreGuard.ElevatedExecutionDenied() : WindowsCollectors.DisableStartup(name, source);
+    public ActionResult RestoreStartup(string id) => _privilegeBlocked ? CoreGuard.ElevatedExecutionDenied() : WindowsCollectors.RestoreStartup(id);
+    public ActionResult StopProcess(int pid) => _privilegeBlocked ? CoreGuard.ElevatedExecutionDenied() : WindowsCollectors.StopProcess(pid);
+    public ActionResult StopService(string name) => _privilegeBlocked ? CoreGuard.ElevatedExecutionDenied() : WindowsCollectors.StopService(name);
     public AppSettings GetSettings() => _settings;
 
     public async Task<AppSettings> UpdateSettingsAsync(AppSettings settings)
@@ -96,7 +112,7 @@ public sealed class CoreHost : IDisposable
         _settings = await _settingsStore.SaveAsync(settings);
         _sessions.RegistryMonitoringEnabled = _settings.RegistryMonitoring;
         if (_monitoringRequested) ApplyMonitoringConfiguration();
-        await _events.ApplyRetentionAsync(_settings.RetentionDays);
+        if (!_privilegeBlocked) await _events.ApplyRetentionAsync(_settings.RetentionDays);
         return _settings;
     }
 
@@ -109,6 +125,7 @@ public sealed class CoreHost : IDisposable
 
     public ActionResult ResumeMonitoring()
     {
+        if (_privilegeBlocked) return CoreGuard.ElevatedExecutionDenied();
         _monitoringRequested = true;
         StartMonitoring();
         return new(true, "Monitoring resumed.", "监控已恢复。");
@@ -116,11 +133,12 @@ public sealed class CoreHost : IDisposable
 
     public async Task<ActionResult> ClearEventsAsync()
     {
+        if (_privilegeBlocked) return CoreGuard.ElevatedExecutionDenied();
         await _events.ClearAsync();
         return new(true, "Event history cleared.", "事件历史已清空。");
     }
-    public async Task<ActionResult> ClearReportsAsync() { await _events.ClearReportsAsync(); return new(true, "Installation reports cleared.", "安装报告已清除。"); }
-    public async Task<ActionResult> ResetDatabaseAsync() { await _events.ResetAsync(); await _rules.InitializeAsync(); return new(true, "Local database reset.", "本地数据库已重置。"); }
+    public async Task<ActionResult> ClearReportsAsync() { if (_privilegeBlocked) return CoreGuard.ElevatedExecutionDenied(); await _events.ClearReportsAsync(); return new(true, "Installation reports cleared.", "安装报告已清除。"); }
+    public async Task<ActionResult> ResetDatabaseAsync() { if (_privilegeBlocked) return CoreGuard.ElevatedExecutionDenied(); await _events.ResetAsync(); await _rules.InitializeAsync(); return new(true, "Local database reset.", "本地数据库已重置。"); }
 
     private void StartMonitoring()
     {
@@ -133,7 +151,7 @@ public sealed class CoreHost : IDisposable
         lock (_monitoringGate)
         {
             StopCollectors();
-            if (!_monitoringRequested) return;
+            if (!_monitoringRequested || _privilegeBlocked) return;
             _batteryLimited = _settings.PauseOnBattery && PowerStatus.IsOnBattery();
             _etw.Start(_settings.FileMonitoring, _settings.ProcessMonitoring);
             if (_settings.FileMonitoring) _files.Start(_settings.FullDiskMonitoring && !_batteryLimited);
@@ -157,6 +175,10 @@ public sealed class CoreHost : IDisposable
     {
         lock (_monitoringGate)
         {
+            if (_privilegeBlocked)
+                return Enumerable.Range(0, 10).Select(index => new MonitorModuleStatus(
+                    new[] { "file", "process", "registry", "service", "startup", "browser", "network", "update", "usn", "etw" }[index],
+                    "blocked", CoreGuard.ElevatedExecutionMessage, CoreGuard.ElevatedExecutionMessageZh)).ToArray();
             MonitorModuleStatus Status(string id, bool enabled, bool running, string active, string activeZh)
             {
                 if (!enabled) return new(id, "disabled", "Disabled in Settings.", "已在设置中关闭。");

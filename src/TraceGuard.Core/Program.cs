@@ -59,8 +59,8 @@ while ((line = await Console.In.ReadLineAsync()) is not null)
             "clearEvents" => await host.ClearEventsAsync(),
             "clearReports" => await host.ClearReportsAsync(),
             "resetDatabase" => await host.ResetDatabaseAsync(),
-            "stopProcess" => WindowsCollectors.StopProcess(ReadInt(request.Params, "pid", -1)),
-            "stopService" => WindowsCollectors.StopService(ReadString(request.Params, "name")),
+            "stopProcess" => host.StopProcess(ReadInt(request.Params, "pid", -1)),
+            "stopService" => host.StopService(ReadString(request.Params, "name")),
             _ => throw new InvalidOperationException($"Unknown TraceGuard Core method: {request.Method}")
         };
         Write(new RpcResponse(request.Id, result));

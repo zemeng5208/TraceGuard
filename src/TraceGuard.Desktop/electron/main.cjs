@@ -1,8 +1,10 @@
 const { app, BrowserWindow, dialog, globalShortcut, ipcMain, Menu, nativeImage, nativeTheme, Notification, screen, systemPreferences, Tray } = require('electron');
 const fs = require('node:fs');
+const os = require('node:os');
 const path = require('node:path');
 const { pathToFileURL } = require('node:url');
 const { CoreClient } = require('./core-client.cjs');
+const { setCompatibleBackgroundMaterial, withCompatibleBackgroundMaterial } = require('./windows-background-material.cjs');
 
 const isDev = Boolean(process.env.VITE_DEV_SERVER_URL);
 const windows = new Map();
@@ -12,12 +14,13 @@ let tray;
 let windowState = {};
 const stateTimers = new Map();
 const collapseTimers = new Map();
+const backgroundMaterialEnvironment = { platform: process.platform, release: os.release() };
 let runtimeSettings = { closeBehavior: 'tray', launchAtSignIn: false, startMinimized: false, startSurface: 'console', floatingWidgetEnabled: true, alwaysOnTop: true, clickThrough: false };
 const severityRank = { informational: 0, normal: 1, important: 2, critical: 3 };
 const notificationThreshold = { all: 0, important: 2, critical: 3, off: 99 };
 const eventPages = { startup: 'startup', service: 'services', browser: 'browser', network: 'network', update: 'update', file: 'files', registry: 'registry', process: 'processes' };
 const nativeStrings = {
-  open: ['Open TraceGuard', '打开 TraceGuard'], terminal: ['Live Terminal', '实时终端'], pause: ['Pause Monitoring', '暂停监控'],
+  open: ['Open TraceGuard', '打开 TraceGuard'], terminal: ['Live Terminal', '实时终端'], pause: ['Pause Monitoring', '暂停监控'], resume: ['Resume Monitoring', '继续监控'],
   widget: ['Floating Window', '悬浮窗'], bubble: ['Floating Bubble', '悬浮球'], collapse: ['Collapse to Bubble', '收缩为悬浮球'],
   alwaysOnTop: ['Always on Top', '始终置顶'], settings: ['Settings', '设置'], exit: ['Exit', '退出'], live: ['LIVE', '监控中'],
 };
@@ -97,7 +100,11 @@ function createWindow(surface = 'main') {
     bubble: { width: 112, height: 112, backgroundColor: '#00000000', transparent: true, alwaysOnTop: true, skipTaskbar: true, resizable: false },
     preview: { width: 230, height: 168, backgroundColor: '#00000000', transparent: true, alwaysOnTop: true, skipTaskbar: true, focusable: false, resizable: false },
   };
-  const window = new BrowserWindow({ ...commonOptions, ...rememberedBounds(surface, surfaceOptions[surface]) });
+  const surfaceWindowOptions = withCompatibleBackgroundMaterial(
+    rememberedBounds(surface, surfaceOptions[surface]),
+    backgroundMaterialEnvironment,
+  );
+  const window = new BrowserWindow({ ...commonOptions, ...surfaceWindowOptions });
   windows.set(surface, window);
   window.loadURL(rendererUrl(surface));
   if (surface === 'preview') window.setIgnoreMouseEvents(true);
@@ -153,12 +160,14 @@ function openMainPage(page) {
   return main;
 }
 
-function showBubbleMenu(window) {
+async function showBubbleMenu(window) {
+  let paused = false;
+  try { paused = (await core.request('getOverview'))?.monitoringMode === 'paused'; } catch { }
   Menu.buildFromTemplate([
     { label: nativeText('open'), click: () => createWindow('main') },
     { label: nativeText('terminal'), click: () => createWindow('terminal') },
     { type: 'separator' },
-    { label: nativeText('pause'), click: () => void core.request('pauseMonitoring') },
+    { label: nativeText(paused ? 'resume' : 'pause'), click: () => void core.request(paused ? 'resumeMonitoring' : 'pauseMonitoring') },
     { label: nativeText('widget'), click: () => createWindow('widget') },
     { label: nativeText('collapse'), enabled: false },
     { label: nativeText('alwaysOnTop'), type: 'checkbox', checked: window.isAlwaysOnTop(), click: (item) => window.setAlwaysOnTop(item.checked) },
@@ -195,7 +204,7 @@ function applyWindowSettings() {
   const material = runtimeSettings.visualStyle === 'solid' ? 'none' : runtimeSettings.visualStyle === 'mica' ? 'mica' : 'acrylic';
   for (const [surface, window] of windows) {
     if (window.isDestroyed()) continue;
-    if (surface !== 'bubble' && surface !== 'preview') { try { window.setBackgroundMaterial(material); } catch { } }
+    if (surface !== 'bubble' && surface !== 'preview') setCompatibleBackgroundMaterial(window, material, backgroundMaterialEnvironment);
     if (surface === 'widget') {
       window.setAlwaysOnTop(Boolean(runtimeSettings.alwaysOnTop));
       window.setIgnoreMouseEvents(Boolean(runtimeSettings.clickThrough), { forward: true });
@@ -264,7 +273,7 @@ app.whenReady().then(() => {
     if (Notification.isSupported() && notificationEnabled(event)) {
       const isZh = usesChinese();
       const notification = new Notification({ title: isZh ? event.easyMessageZh : event.easyMessage, body: event.detail, silent: !runtimeSettings.notificationSound });
-      notification.on('click', () => openMainPage(event.action === 'INSTALLER_COMPLETE' ? 'applications' : (eventPages[event.category] ?? 'dashboard')));
+      notification.on('click', () => openMainPage(event.action === 'INSTALLER_COMPLETE' ? 'applications' : event.action === 'RULE_DECISION_REQUIRED' ? 'rules' : (eventPages[event.category] ?? 'dashboard')));
       notification.show();
     }
   });

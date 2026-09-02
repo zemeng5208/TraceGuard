@@ -108,6 +108,7 @@ public static class WindowsCollectors
 
     public static ActionResult StopProcess(int pid)
     {
+        if (ExecutionPrivilegeGuard.IsBlocked) return CoreGuard.ElevatedExecutionDenied();
         try
         {
             using var process = Process.GetProcessById(pid);
@@ -122,6 +123,7 @@ public static class WindowsCollectors
 
     public static ActionResult StopService(string name)
     {
+        if (ExecutionPrivilegeGuard.IsBlocked) return CoreGuard.ElevatedExecutionDenied();
         if (CoreGuard.IsProtectedService(name)) return CoreGuard.Denied();
         try
         {
@@ -136,6 +138,7 @@ public static class WindowsCollectors
 
     public static ActionResult DisableStartup(string name, string source)
     {
+        if (ExecutionPrivilegeGuard.IsBlocked) return CoreGuard.ElevatedExecutionDenied();
         try
         {
             if (source is "run" or "run-once")
@@ -187,6 +190,7 @@ public static class WindowsCollectors
 
     public static ActionResult RestoreStartup(string id)
     {
+        if (ExecutionPrivilegeGuard.IsBlocked) return CoreGuard.ElevatedExecutionDenied();
         try
         {
             if (id.StartsWith("legacy:", StringComparison.Ordinal)) return RestoreLegacy(id[7..]);

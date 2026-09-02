@@ -2,10 +2,19 @@ using TraceGuard.Core.Models;
 
 namespace TraceGuard.Core.Monitoring;
 
-public sealed class FileMonitor(Action<TraceEvent> publish) : IDisposable
+public sealed class FileMonitor : IDisposable
 {
+    private readonly Action<TraceEvent> _publish;
+    private readonly MonitoringPathExclusions _exclusions;
     private readonly List<FileSystemWatcher> _watchers = [];
-    private readonly UsnJournalMonitor _journal = new(publish);
+    private readonly UsnJournalMonitor _journal;
+
+    internal FileMonitor(Action<TraceEvent> publish, MonitoringPathExclusions exclusions)
+    {
+        _publish = publish;
+        _exclusions = exclusions;
+        _journal = new UsnJournalMonitor(publish, exclusions);
+    }
     public int WatcherCount => _watchers.Count;
     public int UsnVolumeCount => _journal.VolumeCount;
     public int ActiveSourceCount => WatcherCount + UsnVolumeCount;
@@ -40,21 +49,29 @@ public sealed class FileMonitor(Action<TraceEvent> publish) : IDisposable
                 IncludeSubdirectories = true,
                 NotifyFilter = NotifyFilters.FileName | NotifyFilters.DirectoryName | NotifyFilters.LastWrite | NotifyFilters.Size,
                 InternalBufferSize = 32 * 1024,
-                EnableRaisingEvents = true,
+                EnableRaisingEvents = false,
             };
             watcher.Created += (_, e) => Emit("CREATE", e.FullPath, "A file was created", "创建了文件");
             watcher.Changed += (_, e) => Emit("MODIFY", e.FullPath, "A file was modified", "修改了文件");
             watcher.Deleted += (_, e) => Emit("DELETE", e.FullPath, "A file was deleted", "删除了文件");
-            watcher.Renamed += (_, e) => Emit("RENAME", $"{e.OldFullPath} → {e.FullPath}", "A file was renamed or moved", "文件被重命名或移动");
+            watcher.Renamed += (_, e) =>
+            {
+                if (_exclusions.IsExcluded(e.OldFullPath) || _exclusions.IsExcluded(e.FullPath)) return;
+                Emit("RENAME", $"{e.OldFullPath} → {e.FullPath}", "A file was renamed or moved", "文件被重命名或移动");
+            };
+            watcher.EnableRaisingEvents = true;
             _watchers.Add(watcher);
         }
         catch (UnauthorizedAccessException) { }
         catch (IOException) { }
     }
 
-    private void Emit(string action, string path, string english, string chinese) => publish(new TraceEvent(
-        0, DateTimeOffset.UtcNow, "file", action, english, chinese, path, null, null,
-        IsUserDocument(path) ? "important" : "normal"));
+    private void Emit(string action, string path, string english, string chinese)
+    {
+        if (_exclusions.IsExcluded(path)) return;
+        _publish(new TraceEvent(0, DateTimeOffset.UtcNow, "file", action, english, chinese, path, null, null,
+            IsUserDocument(path) ? "important" : "normal"));
+    }
 
     private static bool IsUserDocument(string path)
     {

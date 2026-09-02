@@ -11,7 +11,7 @@ namespace TraceGuard.Core.Monitoring;
 /// volume for read access. It never creates, resizes, deletes, or otherwise
 /// modifies a journal and never attempts to enable a privilege.
 /// </summary>
-public sealed class UsnJournalMonitor(Action<TraceEvent> publish) : IDisposable
+public sealed class UsnJournalMonitor : IDisposable
 {
     private const uint GenericRead = 0x80000000;
     private const uint OpenExisting = 3;
@@ -22,9 +22,17 @@ public sealed class UsnJournalMonitor(Action<TraceEvent> publish) : IDisposable
     private const int HeaderSize = sizeof(long);
     private const int MaxBatchesPerPoll = 8;
 
+    private readonly Action<TraceEvent> _publish;
+    private readonly MonitoringPathExclusions _exclusions;
     private readonly object _gate = new();
     private readonly List<VolumeReader> _volumes = [];
     private Timer? _timer;
+
+    internal UsnJournalMonitor(Action<TraceEvent> publish, MonitoringPathExclusions exclusions)
+    {
+        _publish = publish;
+        _exclusions = exclusions;
+    }
 
     public int VolumeCount
     {
@@ -114,9 +122,12 @@ public sealed class UsnJournalMonitor(Action<TraceEvent> publish) : IDisposable
             {
                 var action = ClassifyAction(record.Reason);
                 if (action is null) continue;
-                var path = ResolvePath(volume, record) ?? $"{volume.Root}[USN] {record.FileName}";
+                var resolvedPath = ResolvePath(volume, record);
+                if (resolvedPath is null && _exclusions.IsExcludedUnresolvedFileName(record.FileName)) continue;
+                var path = resolvedPath ?? $"{volume.Root}[USN] {record.FileName}";
+                if (_exclusions.IsExcluded(path)) continue;
                 var (english, chinese) = Messages(action);
-                publish(new TraceEvent(0, DateTimeOffset.UtcNow, "file", action, english, chinese,
+                _publish(new TraceEvent(0, DateTimeOffset.UtcNow, "file", action, english, chinese,
                     path, null, null, IsUserDocument(path) ? "important" : "normal"));
             }
 

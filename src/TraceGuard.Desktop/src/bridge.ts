@@ -13,11 +13,16 @@ import {
   previewUpdateItems,
   previewAssociationItems,
 } from '@/data/preview';
-import type { AppSettings, TraceEvent, TraceGuardApi, TraceRule } from '@/types';
+import type { ActionResult, AppSettings, Locale, TraceEvent, TraceGuardApi, TraceRule } from '@/types';
 
 const STORAGE_KEY = 'traceguard-preview-settings-v1';
 let previewRuleState: TraceRule[] = previewRules.map((rule) => ({ ...rule }));
-let previewRestoreState = previewRestoreItems.map((item) => ({ ...item }));
+
+const previewOnlyResult = (operation: string, operationZh: string): ActionResult => ({
+  success: false,
+  message: `${operation} is unavailable because TraceGuard is showing preview data without the desktop Core.`,
+  messageZh: `TraceGuard 当前仅显示演示数据，未连接桌面 Core，无法${operationZh}。`,
+});
 
 const readPreviewSettings = (): AppSettings => {
   try {
@@ -35,7 +40,7 @@ const previewApi: TraceGuardApi = {
   getProcesses: async () => previewProcesses,
   getServices: async () => previewServices,
   getStartupItems: async () => previewStartup,
-  getRestoreItems: async () => previewRestoreState,
+  getRestoreItems: async () => previewRestoreItems,
   getBrowserItems: async () => previewBrowserItems,
   getNetworkItems: async () => previewNetworkItems,
   getWindowsUpdateItems: async () => previewUpdateItems,
@@ -43,30 +48,26 @@ const previewApi: TraceGuardApi = {
   getSessions: async (limit = 100) => previewSessions.slice(0, limit),
   getStorageInfo: async () => ({ databasePath: '%LOCALAPPDATA%\\TraceGuard\\traceguard.db', databaseBytes: 1_835_008, eventCount: previewEvents.length, reportCount: previewSessions.length, ruleCount: previewRuleState.length }),
   getRules: async () => previewRuleState,
-  saveRule: async (rule) => {
-    const saved = { ...rule, id: rule.id || crypto.randomUUID(), updatedAt: new Date().toISOString() };
-    previewRuleState = [...previewRuleState.filter((item) => item.processPattern.toLowerCase() !== saved.processPattern.toLowerCase()), saved];
-    return saved;
-  },
-  deleteRule: async (id) => { previewRuleState = previewRuleState.filter((rule) => rule.id !== id); return { success: true }; },
-  disableStartup: async () => ({ success: false, message: 'Preview mode', messageZh: '预览模式不可修改启动项' }),
-  restoreStartup: async (id) => { previewRestoreState = previewRestoreState.filter((item) => item.id !== id); return { success: true, message: 'Startup item restored.', messageZh: '用户级启动项已恢复。' }; },
+  saveRule: async () => { throw new Error('Preview only / 仅演示数据：未连接桌面 Core，规则未保存。'); },
+  deleteRule: async () => previewOnlyResult('Deleting rules', '删除规则'),
+  disableStartup: async () => previewOnlyResult('Disabling startup entries', '禁用启动项'),
+  restoreStartup: async () => previewOnlyResult('Restoring startup entries', '恢复启动项'),
   getSettings: async () => readPreviewSettings(),
   updateSettings: async (settings) => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
     return settings;
   },
-  pauseMonitoring: async () => ({ success: true }),
-  resumeMonitoring: async () => ({ success: true }),
-  clearEvents: async () => ({ success: true }),
-  clearReports: async () => ({ success: true }),
-  resetDatabase: async () => ({ success: true }),
+  pauseMonitoring: async () => previewOnlyResult('Pausing monitoring', '暂停监控'),
+  resumeMonitoring: async () => previewOnlyResult('Resuming monitoring', '恢复监控'),
+  clearEvents: async () => previewOnlyResult('Clearing event history', '清除事件历史'),
+  clearReports: async () => previewOnlyResult('Clearing reports', '清除报告'),
+  resetDatabase: async () => previewOnlyResult('Resetting the database', '重置数据库'),
   getSystemAccent: async () => '#4c97ff',
-  exportSettings: async () => ({ success: true, message: 'Settings exported.', messageZh: '设置已导出。' }),
-  importSettings: async () => ({ success: false, message: 'Available in the desktop app.', messageZh: '请在桌面应用中使用。' }),
-  exportReport: async () => ({ success: true, message: 'Report exported.', messageZh: '报告已导出。' }),
-  stopProcess: async () => ({ success: false, message: 'Preview mode', messageZh: '预览模式不可执行系统操作' }),
-  stopService: async () => ({ success: false, message: 'Preview mode', messageZh: '预览模式不可执行系统操作' }),
+  exportSettings: async () => previewOnlyResult('Exporting settings', '导出设置'),
+  importSettings: async () => previewOnlyResult('Importing settings', '导入设置'),
+  exportReport: async () => previewOnlyResult('Exporting reports', '导出报告'),
+  stopProcess: async () => previewOnlyResult('Stopping processes', '停止进程'),
+  stopService: async () => previewOnlyResult('Stopping services', '停止服务'),
   showSurface: async (surface) => {
     const url = new URL(window.location.href);
     url.searchParams.set('surface', surface);
@@ -81,6 +82,16 @@ const previewApi: TraceGuardApi = {
 };
 
 export const traceGuardApi = (): TraceGuardApi => window.traceGuard ?? previewApi;
+
+export const actionResultMessage = (
+  result: ActionResult,
+  locale: Locale,
+  fallback: { success: string; successZh: string; failure: string; failureZh: string },
+): string => {
+  const isZh = locale === 'zh-CN' || (locale === 'auto' && navigator.language.toLowerCase().startsWith('zh'));
+  if (isZh) return result.messageZh || (result.success ? fallback.successZh : fallback.failureZh);
+  return result.message || (result.success ? fallback.success : fallback.failure);
+};
 
 export const mergeEvent = (events: TraceEvent[], event: TraceEvent, limit: number): TraceEvent[] =>
   [event, ...events.filter((item) => item.id !== event.id)].slice(0, limit);

@@ -8,7 +8,7 @@ import { isChinese, secondaryText, text } from '@/i18n';
 import type { AppSettings, EventCategory, MonitorModuleStatus, Overview, StorageInfo } from '@/types';
 import { TRACEGUARD_VERSION } from '@/version';
 import { defaultSettings } from '@/data/preview';
-import { traceGuardApi } from '@/bridge';
+import { actionResultMessage, traceGuardApi } from '@/bridge';
 
 type SectionId = 'general' | 'appearance' | 'language' | 'monitoring' | 'floatingWindow' | 'floatingBubble' | 'liveTerminal' | 'notifications' | 'startupBackground' | 'privacy' | 'storage' | 'protection' | 'advanced' | 'about';
 
@@ -103,19 +103,29 @@ interface SettingsContentProps { settings: AppSettings; onChange: (patch: Partia
 function StorageContent({ settings, onChange }: SettingsContentProps) {
   const isZh = zh(settings);
   const [info, setInfo] = useState<StorageInfo | null>(null);
-  const [status, setStatus] = useState('');
+  const [status, setStatus] = useState<{ message: string; success: boolean } | null>(null);
   const refresh = () => void api.getStorageInfo().then(setInfo).catch(() => setInfo(null));
   useEffect(refresh, []);
-  const run = async (action: () => Promise<{success:boolean;message?:string;messageZh?:string}>) => { const result = await action(); setStatus(isZh ? result.messageZh ?? '' : result.message ?? ''); refresh(); };
+  const showResult = (result: {success:boolean;message?:string;messageZh?:string}) => setStatus({
+    success: result.success,
+    message: actionResultMessage(result, settings.locale, {
+      success: 'Operation completed.', successZh: '操作已完成。',
+      failure: 'The operation was not completed.', failureZh: '操作未完成。',
+    }),
+  });
+  const run = async (action: () => Promise<{success:boolean;message?:string;messageZh?:string}>) => {
+    try { const result = await action(); showResult(result); if (result.success) refresh(); }
+    catch (error) { setStatus({ success: false, message: error instanceof Error ? error.message : String(error) }); }
+  };
   return <SettingCard title={isZh ? '事件与本地数据库' : 'Events & local database'}>
     <SettingRow title={isZh ? '数据保留' : 'Retention'} description={isZh ? '过期事件在后台安全清理。' : 'Expired events are removed safely in the background.'}><Choices value={settings.retentionDays} options={[{ value: 1, label: '1D' }, { value: 7, label: '7D' }, { value: 30, label: '30D' }, { value: 90, label: '90D' }, { value: 0, label: '∞' }]} onChange={(retentionDays) => onChange({ retentionDays })} /></SettingRow>
     <SettingRow title={isZh ? '数据库位置' : 'Database Location'} description={info?.databasePath ?? '%LOCALAPPDATA%\\TraceGuard\\traceguard.db'}><span className="local-pill">{formatBytes(info?.databaseBytes ?? 0)} · {isZh ? '仅本机' : 'Local only'}</span></SettingRow>
     <SettingRow title={isZh ? '数据摘要' : 'Stored data'} description={`${info?.eventCount ?? 0} ${isZh?'个事件':'events'} · ${info?.reportCount ?? 0} ${isZh?'份报告':'reports'} · ${info?.ruleCount ?? 0} ${isZh?'条规则':'rules'}`}><span className="local-pill">SQLite</span></SettingRow>
-    <SettingRow title={isZh ? '导出 / 导入设置' : 'Export / Import Settings'} description={isZh ? 'JSON 只包含设置，不包含事件、规则或报告。' : 'JSON contains settings only—never events, rules, or reports.'}><div className="storage-actions"><button className="glass-button" type="button" onClick={()=>void run(()=>api.exportSettings())}>{isZh?'导出':'Export'}</button><button className="glass-button" type="button" onClick={()=>void (async()=>{const result=await api.importSettings(); setStatus(isZh?result.messageZh??'':result.message??''); if(result.success&&result.settings) onChange(result.settings); refresh();})()}>{isZh?'导入':'Import'}</button></div></SettingRow>
+    <SettingRow title={isZh ? '导出 / 导入设置' : 'Export / Import Settings'} description={isZh ? 'JSON 只包含设置，不包含事件、规则或报告。' : 'JSON contains settings only—never events, rules, or reports.'}><div className="storage-actions"><button className="glass-button" type="button" onClick={()=>void run(()=>api.exportSettings())}>{isZh?'导出':'Export'}</button><button className="glass-button" type="button" onClick={()=>void (async()=>{try { const result=await api.importSettings(); showResult(result); if(result.success&&result.settings) { onChange(result.settings); refresh(); } } catch(error) { setStatus({success:false,message:error instanceof Error?error.message:String(error)}); }})()}>{isZh?'导入':'Import'}</button></div></SettingRow>
     <SettingRow title={isZh ? '清除事件历史' : 'Clear Event History'} description={isZh ? '不影响设置、规则和安装报告。' : 'Does not change settings, rules, or installation reports.'}><button className="danger-button" type="button" onClick={() => { if (window.confirm(isZh ? '确定清除全部事件历史？此操作无法撤销。' : 'Clear all event history? This cannot be undone.')) void run(()=>api.clearEvents()); }}>{isZh ? '清除历史' : 'Clear history'}</button></SettingRow>
     <SettingRow title={isZh ? '清除安装报告' : 'Clear Reports'} description={isZh ? '删除安装会话报告，不影响事件和规则。' : 'Deletes installation session reports without changing events or rules.'}><button className="danger-button" type="button" onClick={()=>{if(window.confirm(isZh?'确定清除全部安装报告？':'Clear all installation reports?')) void run(()=>api.clearReports());}}>{isZh?'清除报告':'Clear reports'}</button></SettingRow>
     <SettingRow title={isZh ? '重置数据库' : 'Reset Database'} description={isZh ? '删除事件、报告和规则；不会重置设置。' : 'Deletes events, reports, and rules; settings remain unchanged.'}><button className="danger-button" type="button" onClick={()=>{if(window.confirm(isZh?'重置本地数据库？事件、报告和规则将永久删除。':'Reset the local database? Events, reports, and rules will be permanently deleted.')) void run(()=>api.resetDatabase());}}>{isZh?'重置数据库':'Reset database'}</button></SettingRow>
-    {status ? <p className="inline-status">{status}</p> : null}
+    {status ? <p className={`inline-status ${status.success ? 'is-success' : 'is-error'}`} role="status">{status.message}</p> : null}
   </SettingCard>;
 }
 

@@ -1,6 +1,6 @@
 import { AlertTriangle, AppWindow, ChevronRight, Clock3, Download, FilePlus2, FolderSync, GitBranch, RadioTower, ShieldCheck } from 'lucide-react';
 import { useMemo, useState } from 'react';
-import { traceGuardApi } from '@/bridge';
+import { actionResultMessage, traceGuardApi } from '@/bridge';
 import { isChinese, secondaryText, text } from '@/i18n';
 import type { AppSettings, ChangeSummary, InstallationSession } from '@/types';
 
@@ -25,7 +25,7 @@ const formatDuration = (session: InstallationSession) => {
 export function ApplicationsPage({ sessions, settings }: { sessions: InstallationSession[]; settings: AppSettings }) {
   const isZh = isChinese(settings.locale);
   const [selectedId, setSelectedId] = useState<string>();
-  const [status, setStatus] = useState('');
+  const [status, setStatus] = useState<{ message: string; success: boolean } | null>(null);
   const selected = useMemo(() => sessions.find((session) => session.id === selectedId) ?? sessions[0], [selectedId, sessions]);
   const reasons = useMemo(() => selected ? riskReasons(selected, isZh) : [], [isZh, selected]);
 
@@ -55,12 +55,12 @@ export function ApplicationsPage({ sessions, settings }: { sessions: Installatio
             <header className="report-hero">
               <div className="report-orb"><FolderSync size={22} /></div>
               <div><span>{isZh ? '应用行为会话' : 'Application behavior session'}</span><h2>{selected.rootProcess}</h2><small><Clock3 size={12} /> {formatDuration(selected)} · {selected.changeCount.toLocaleString()} {isZh ? '项变化' : 'changes'}</small></div>
-              <div className="report-actions"><button className="glass-button" type="button" onClick={()=>void api.exportReport(selected).then(result=>setStatus(isZh?result.messageZh??'':result.message??''))}><Download size={13}/>{isZh?'导出':'Export'}</button><span className={`risk-pill ${selected.importantCount > 0 ? 'risk-important' : 'risk-normal'}`}>
+              <div className="report-actions"><button className="glass-button" type="button" onClick={()=>void api.exportReport(selected).then(result=>setStatus({success:result.success,message:actionResultMessage(result,settings.locale,{success:'Report exported.',successZh:'报告已导出。',failure:'The report was not exported.',failureZh:'报告未导出。'})})).catch(error=>setStatus({success:false,message:error instanceof Error?error.message:String(error)}))}><Download size={13}/>{isZh?'导出':'Export'}</button><span className={`risk-pill ${selected.importantCount > 0 ? 'risk-important' : 'risk-normal'}`}>
                 {selected.importantCount > 0 ? <AlertTriangle size={13} /> : <ShieldCheck size={13} />}
                 {selected.importantCount} {isZh ? '项重要变化' : 'important'}
               </span></div>
             </header>
-            {status ? <p className="inline-status">{status}</p> : null}
+            {status ? <p className={`inline-status ${status.success ? 'is-success' : 'is-error'}`} role="status">{status.message}</p> : null}
             <div className={`risk-explanation ${reasons.length ? 'has-risk' : ''}`}><ShieldCheck size={17}/><div><strong>{reasons.length ? (isZh?'为什么需要注意':'Why this needs attention') : (isZh?'未发现高优先级行为':'No high-priority behavior detected')}</strong><span>{reasons.length ? reasons.join(' · ') : (isZh?'大量普通程序文件本身不会提高风险等级。':'Large numbers of ordinary program files do not raise risk by themselves.')}</span></div></div>
             <div className="change-summary-grid">
               {summaryItems.map((item) => <article key={item.key}><span>{isZh ? item.zh : item.en}</span><strong>{selected.summary[item.key]}</strong></article>)}

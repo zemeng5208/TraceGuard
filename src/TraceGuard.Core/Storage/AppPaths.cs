@@ -2,9 +2,13 @@ namespace TraceGuard.Core.Storage;
 
 public sealed class AppPaths
 {
-    public AppPaths()
+    public AppPaths() : this(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "TraceGuard"))
     {
-        DataDirectory = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "TraceGuard");
+    }
+
+    internal AppPaths(string dataDirectory)
+    {
+        DataDirectory = dataDirectory;
         Directory.CreateDirectory(DataDirectory);
     }
 

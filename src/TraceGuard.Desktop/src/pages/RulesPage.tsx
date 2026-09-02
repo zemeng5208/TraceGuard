@@ -1,6 +1,6 @@
 import { BellRing, Plus, RotateCcw, ShieldBan, Trash2 } from 'lucide-react';
 import { useMemo, useState } from 'react';
-import { traceGuardApi } from '@/bridge';
+import { actionResultMessage, traceGuardApi } from '@/bridge';
 import { isChinese, secondaryText, text } from '@/i18n';
 import type { AppSettings, TraceRule } from '@/types';
 
@@ -30,8 +30,11 @@ export function RulesPage({ rules, settings, onChanged }: { rules: TraceRule[]; 
   const remove = async (rule: TraceRule) => {
     if (!window.confirm(isZh ? `删除 ${rule.processPattern} 的规则？` : `Delete the rule for ${rule.processPattern}?`)) return;
     const result = await api.deleteRule(rule.id);
-    setMessage(isZh ? (result.messageZh ?? '规则已删除。') : (result.message ?? 'Rule deleted.'));
-    await onChanged();
+    setMessage(actionResultMessage(result, settings.locale, {
+      success: 'Rule deleted.', successZh: '规则已删除。',
+      failure: 'The rule was not deleted.', failureZh: '规则未删除。',
+    }));
+    if (result.success) await onChanged();
   };
 
   return (
@@ -56,7 +59,7 @@ export function RulesPage({ rules, settings, onChanged }: { rules: TraceRule[]; 
           {rules.map((rule) => (
             <article key={rule.id}>
               <span className="rule-icon"><ShieldBan size={17} /></span>
-              <div><strong>{rule.processPattern}</strong><small>{isZh ? '自动启动' : 'Auto start'} → {rule.autoStartAction.toUpperCase()} · {isZh ? '手动启动' : 'Manual'} → {rule.manualStartAction.toUpperCase()}</small></div>
+              <div><strong>{rule.processPattern}</strong><small>{isZh ? '自动启动' : 'Auto start'} → {actionLabel(rule.autoStartAction, isZh)} · {isZh ? '手动启动' : 'Manual'} → {actionLabel(rule.manualStartAction, isZh)}</small></div>
               <div className="rule-badges">{rule.blockAutoRestart ? <span>Auto-Restart</span> : null}{rule.notify ? <span>Notify</span> : null}</div>
               <button className="icon-action" type="button" onClick={() => void remove(rule)} title={isZh ? '删除规则' : 'Delete rule'}><Trash2 size={15} /></button>
             </article>
@@ -69,5 +72,9 @@ export function RulesPage({ rules, settings, onChanged }: { rules: TraceRule[]; 
 }
 
 function RuleSelect({ label, value, onChange, isZh }: { label: string; value: TraceRule['autoStartAction']; onChange: (value: TraceRule['autoStartAction']) => void; isZh: boolean }) {
-  return <div className="rule-select"><span>{label}</span><div>{(['allow', 'ask', 'block'] as const).map((action) => <button key={action} className={value === action ? 'is-selected' : ''} type="button" onClick={() => onChange(action)}><i />{isZh ? ({ allow: '允许', ask: '询问', block: '阻止' }[action]) : action[0].toUpperCase() + action.slice(1)}</button>)}</div></div>;
+  return <div className="rule-select"><span>{label}</span><div>{(['allow', 'ask', 'block'] as const).map((action) => <button key={action} className={value === action ? 'is-selected' : ''} type="button" title={action === 'ask' ? (isZh ? '本次启动先允许，并通知你为以后选择行为。' : 'Allows this launch, then notifies you to choose future behavior.') : undefined} onClick={() => onChange(action)}><i />{actionLabel(action, isZh)}</button>)}</div></div>;
 }
+
+const actionLabel = (action: TraceRule['autoStartAction'], isZh: boolean) => isZh
+  ? ({ allow: '允许', ask: '启动后询问', block: '阻止' }[action])
+  : ({ allow: 'Allow', ask: 'Ask after launch', block: 'Block' }[action]);

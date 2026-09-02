@@ -93,11 +93,12 @@ export function InstallerPanel({ overview, settings, onViewReports }: { overview
 }
 
 export function EventFeed({ events, settings, limit = 5 }: { events: TraceEvent[]; settings: AppSettings; limit?: number }) {
+  const importantEvents = events.filter((event) => event.severity === 'important' || event.severity === 'critical').slice(0, limit);
   return (
     <section className="panel event-feed">
       <header className="panel-title-row"><div><h2>{text('importantEvents', settings.locale)}</h2><span>{secondaryText('importantEvents', settings.locale)}</span></div></header>
       <div className="event-list">
-        {events.slice(0, limit).map((event) => (
+        {importantEvents.map((event) => (
           <div className="event-row" key={event.id}>
             <span className={`event-dot severity-${event.severity}`} />
             <time>{new Date(event.timestamp).toLocaleTimeString([], { hour12: false })}</time>
@@ -106,6 +107,7 @@ export function EventFeed({ events, settings, limit = 5 }: { events: TraceEvent[
             <ChevronRight size={15} />
           </div>
         ))}
+        {importantEvents.length === 0 ? <div className="event-list-empty">{isChinese(settings.locale) ? '暂无重要或严重事件' : 'No important or critical events'}</div> : null}
       </div>
       <button className="text-button" type="button" onClick={() => void api.showSurface('terminal')}>{isChinese(settings.locale) ? '查看更多' : 'View all'} <span>{isChinese(settings.locale) ? 'View All' : '查看更多'}</span></button>
     </section>

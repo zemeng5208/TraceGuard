@@ -7,7 +7,9 @@ TraceGuard is a local-first Windows 10/11 desktop application that explains soft
 
 ## Current status
 
-Version `0.2.0` is the current MVP development build. Phase 1 and the planned Phase 2/3 observation flows are implemented. The current build contains the Electron + React desktop shell, bilingual premium-glass UI, structured live terminal, floating surfaces, a working .NET 8 observation core, CoreGuard, local persistence, installer behavior sessions, process launch chains, registry before/after diffs, user-level startup control, current-user Block Auto-Restart rules, browser/network/default-app baselines, Windows Update activity, exportable behavior reports, and truthful runtime collector health.
+Version `0.2.0` is the current **pre-release MVP candidate**, not a stable release. Phase 1 and the planned Phase 2/3 observation flows are implemented. The current build contains the Electron + React desktop shell, bilingual premium-glass UI, structured live terminal, floating surfaces, a working .NET 8 observation core, CoreGuard, local persistence, installer behavior sessions, process launch chains, registry before/after diffs, user-level startup control, current-user Block Auto-Restart rules, browser/network/default-app baselines, Windows Update activity, exportable behavior reports, and truthful runtime collector health.
+
+`0.2.0` 是当前的 **MVP 预发布候选版本**，并非稳定正式版。安装包、Portable 版本及零提权运行链路已经通过 Windows CI；Windows 10/11 消费级设备的完整实机兼容性矩阵仍在验证中。
 
 ## Safety model
 
@@ -34,10 +36,37 @@ The UI runs in Electron for the frameless console, terminal, widget, and bubble 
 
 ## Supported Windows versions
 
-- Windows 11
-- Windows 10 22H2 (best effort while supported by the underlying Electron and .NET runtimes)
+- Windows 11 x64 (targeted; consumer-hardware matrix validation is still in progress)
+- Windows 10 22H2 x64 (targeted on a best-effort basis while supported by the underlying Electron and .NET runtimes; consumer-hardware validation is still in progress)
 
-Windows 7 is not supported.
+Windows 7 and Windows 8.1 are not supported. No ARM64 package is currently produced. See the distinction between targeted and verified environments in [Compatibility](docs/COMPATIBILITY.md).
+
+## Install, run, verify, and uninstall
+
+The pre-release Windows build provides three files:
+
+- `TraceGuard-Setup-0.2.0-x64.exe` — interactive per-user installer. It does not request administrator permission.
+- `TraceGuard-Portable-0.2.0-x64.exe` — self-extracting portable build. It runs as the current user and does not install a Windows service.
+- `SHA256SUMS.txt` — SHA-256 digests generated from the two executables by the release build.
+
+安装版：运行 `TraceGuard-Setup-0.2.0-x64.exe`，按向导完成当前用户安装。Portable 版：直接运行 `TraceGuard-Portable-0.2.0-x64.exe`。两者均为 x64，均不会请求 UAC 提权。
+
+Before running a downloaded file, place it beside `SHA256SUMS.txt` and verify its digest in PowerShell:
+
+```powershell
+$file = '.\TraceGuard-Setup-0.2.0-x64.exe'
+$expected = (Get-Content .\SHA256SUMS.txt | Where-Object { $_ -match [regex]::Escape((Split-Path $file -Leaf)) }).Split()[0]
+$actual = (Get-FileHash $file -Algorithm SHA256).Hash.ToLowerInvariant()
+$actual -eq $expected
+```
+
+The result must be `True`. Replace `$file` with the Portable filename to verify that build. If the file is absent from `SHA256SUMS.txt` or the result is `False`, do not run it.
+
+TraceGuard `0.2.0` is not code-signed. Windows SmartScreen may therefore show an unknown-publisher warning even when the checksum is valid. Only continue when the executable came from the TraceGuard repository release and its SHA-256 value matches; a future signed build is planned.
+
+Uninstall the installed build from **Settings → Apps → Installed apps → TraceGuard → Uninstall** (or the equivalent Windows 10 Apps & features page). The uninstaller removes the application from the current user; it does not require administrator permission.
+
+Local settings, events, reports, and rules are stored separately under `%LOCALAPPDATA%\TraceGuard`. They are not intentionally removed during an ordinary application uninstall, so reinstalling can preserve local history. To erase them, clear/reset the relevant data from TraceGuard Settings before uninstalling, or—after TraceGuard has exited—remove that directory manually. This never affects files observed by TraceGuard.
 
 ## Development
 
@@ -87,4 +116,10 @@ The Windows build produces two per-user artifacts: `TraceGuard-Setup-<version>-x
 
 File monitoring records metadata only. User-folder scope uses Windows `FileSystemWatcher`. When full-disk monitoring is enabled, TraceGuard starts at the current end of each already-existing NTFS USN Journal that the signed-in user can read, resolves paths by file ID where Windows permits it, and falls back to `FileSystemWatcher` independently for inaccessible or non-NTFS volumes. It never creates, resizes, or deletes a journal. Installer reports associate otherwise unattributed file events with an installer session by time window and label that result best-effort. If the current token already belongs to Windows' `Performance Log Users` group, TraceGuard starts a normal real-time ETW session for only the process and file manifest providers and attaches PID/process identity when an exact normalized path matches a primary collector event. It never uses the privileged NT Kernel Logger, changes group membership, captures stacks, or persists raw ETW payloads; failure leaves the primary data chain active. Disk activity aggregates I/O counters from processes readable by the current user, so elevated or protected-process activity can remain unaccounted for. The UI labels these boundaries instead of inventing values.
 
-See [architecture](docs/ARCHITECTURE.md), [security model](docs/SECURITY.md), and [development progress](docs/PROGRESS.md).
+## License status
+
+No software license has been declared for this repository yet. Do not infer redistribution or reuse rights from source availability.
+
+本仓库目前尚未声明软件许可证；不要仅根据源码可见性推断再分发或复用权限。
+
+See [architecture](docs/ARCHITECTURE.md), [security model](docs/SECURITY.md), [compatibility](docs/COMPATIBILITY.md), [v0.2.0 pre-release notes](docs/releases/v0.2.0.md), and [development progress](docs/PROGRESS.md).

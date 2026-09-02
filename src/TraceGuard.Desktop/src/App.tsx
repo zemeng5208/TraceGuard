@@ -1,4 +1,5 @@
 import { startTransition, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { TriangleAlert } from 'lucide-react';
 import { traceGuardApi } from '@/bridge';
 import { defaultSettings } from '@/data/preview';
 import { Sidebar, type PageId } from '@/components/Sidebar';
@@ -135,18 +136,18 @@ export function App() {
 
   useEffect(() => { localStorage.setItem('traceguard:last-page', page); }, [page]);
 
-  if (surface === 'widget') return <WidgetSurface overview={overview} events={events} settings={settings} />;
-  if (surface === 'bubble') return <BubbleSurface overview={overview} events={events} settings={settings} />;
-  if (surface === 'preview') return <PreviewSurface overview={overview} events={events} settings={settings} />;
-  if (surface === 'terminal') return <TerminalSurface events={events} settings={settings} />;
+  if (surface === 'widget') return <><PreviewModeBadge settings={settings} /><WidgetSurface overview={overview} events={events} settings={settings} /></>;
+  if (surface === 'bubble') return <><PreviewModeBadge settings={settings} /><BubbleSurface overview={overview} events={events} settings={settings} /></>;
+  if (surface === 'preview') return <><PreviewModeBadge settings={settings} /><PreviewSurface overview={overview} events={events} settings={settings} /></>;
+  if (surface === 'terminal') return <><PreviewModeBadge settings={settings} /><TerminalSurface events={events} settings={settings} /></>;
 
   const pageNode = useMemo(() => {
     switch (page) {
       case 'dashboard': return <DashboardPage overview={overview} events={events} settings={settings} onViewReports={() => setPage('applications')} />;
       case 'terminal': return <TerminalPage events={events} settings={settings} />;
       case 'applications': return <ApplicationsPage sessions={sessions} settings={settings} />;
-      case 'processes': return <ProcessesPage rows={processes} settings={settings} />;
-      case 'services': return <ServicesPage rows={services} settings={settings} />;
+      case 'processes': return <ProcessesPage rows={processes} settings={settings} onChanged={refresh} />;
+      case 'services': return <ServicesPage rows={services} settings={settings} onChanged={refresh} />;
       case 'startup': return <StartupPage rows={startup} settings={settings} onChanged={refresh} />;
       case 'rules': return <RulesPage rules={rules} settings={settings} onChanged={refresh} />;
       case 'restore': return <RestorePage items={restoreItems} settings={settings} onChanged={refresh} />;
@@ -165,7 +166,8 @@ export function App() {
     <div className={`app-shell visual-${settings.visualStyle}`}>
       <Sidebar active={page} onSelect={setPage} settings={settings} />
       <main className="main-stage">
-        <WindowBar page={page} settings={settings} onSettings={updateSettings} />
+        <WindowBar page={page} settings={settings} onOpenSettings={() => setPage('settings')} />
+        {api.isPreview ? <div className="preview-mode-banner" role="status"><TriangleAlert size={16} /><span><strong>PREVIEW DATA · 演示数据</strong><small>Desktop bridge/Core unavailable; system actions are disabled. · 未连接桌面桥接/Core，系统操作已禁用。</small></span></div> : null}
         {coreError ? <div className="core-error"><strong>TraceGuard Core unavailable</strong><span>{coreError}</span></div> : null}
         <div className="page-scroll">{pageNode}</div>
       </main>
@@ -174,3 +176,8 @@ export function App() {
 }
 
 const isZh = (settings: AppSettings) => settings.locale === 'zh-CN' || (settings.locale === 'auto' && navigator.language.toLowerCase().startsWith('zh'));
+
+function PreviewModeBadge({ settings }: { settings: AppSettings }) {
+  if (!api.isPreview) return null;
+  return <div className="preview-mode-badge" role="status">{isZh(settings) ? '演示数据 · PREVIEW ONLY' : 'PREVIEW ONLY · 演示数据'}</div>;
+}

@@ -1,6 +1,6 @@
-import { ChevronDown, Maximize2, Minus, Moon, PanelTop, Sun, X } from 'lucide-react';
+import { Maximize2, Minus, Settings2, X } from 'lucide-react';
 import { traceGuardApi } from '@/bridge';
-import { isChinese, secondaryText, text } from '@/i18n';
+import { secondaryText, text } from '@/i18n';
 import type { AppSettings } from '@/types';
 import type { PageId } from '@/components/Sidebar';
 
@@ -13,10 +13,10 @@ const pageKeys: Record<PageId, string> = {
 interface WindowBarProps {
   page: PageId;
   settings: AppSettings;
-  onSettings: (patch: Partial<AppSettings>) => void;
+  onOpenSettings: () => void;
 }
 
-export function WindowBar({ page, settings, onSettings }: WindowBarProps) {
+export function WindowBar({ page, settings, onOpenSettings }: WindowBarProps) {
   const api = traceGuardApi();
   const key = pageKeys[page];
   return (
@@ -29,20 +29,10 @@ export function WindowBar({ page, settings, onSettings }: WindowBarProps) {
         <button
           className="select-like"
           type="button"
-          onClick={() => onSettings({ theme: settings.theme === 'dark' ? 'light' : 'dark' })}
+          onClick={onOpenSettings}
         >
-          {settings.theme === 'dark' ? <Moon size={14} /> : <Sun size={14} />}
-          {text(settings.theme === 'dark' ? 'dark' : 'light', settings.locale)}
-          <ChevronDown size={13} />
-        </button>
-        <button
-          className="select-like"
-          type="button"
-          onClick={() => onSettings({ locale: isChinese(settings.locale) ? 'en-US' : 'zh-CN' })}
-        >
-          <PanelTop size={14} />
-          {isChinese(settings.locale) ? '简体中文' : 'English'}
-          <ChevronDown size={13} />
+          <Settings2 size={14} />
+          {text('settings', settings.locale)}
         </button>
         <span className="window-control-separator" />
         <button className="window-control" type="button" aria-label="Minimize" onClick={() => void api.windowAction('minimize')}><Minus size={14} /></button>

@@ -31,6 +31,7 @@ public sealed class RuleEngine(EventStore store, Action<TraceEvent> publish)
 
     public void OnProcess(ProcessObservation process)
     {
+        if (ExecutionPrivilegeGuard.IsBlocked) return;
         if (!process.Started) return;
         var rule = _rules.FirstOrDefault(item => Matches(item.ProcessPattern, process.Name, process.Executable));
         if (rule is null) return;

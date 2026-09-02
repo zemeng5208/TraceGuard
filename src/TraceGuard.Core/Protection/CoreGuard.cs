@@ -2,6 +2,8 @@ namespace TraceGuard.Core.Protection;
 
 public static class CoreGuard
 {
+    public const string ElevatedExecutionMessage = "TraceGuard detected an elevated or high-integrity token. Zero-Privilege safety mode has blocked monitoring and destructive actions. Restart TraceGuard normally without Run as administrator.";
+    public const string ElevatedExecutionMessageZh = "TraceGuard 检测到提升权限或高完整性令牌。零提权安全模式已阻止监控和所有破坏性操作。请不要使用“以管理员身份运行”，并正常重启 TraceGuard。";
     private static readonly HashSet<string> ProtectedProcesses = new(StringComparer.OrdinalIgnoreCase)
     {
         "system", "registry", "smss", "csrss", "wininit", "winlogon", "services", "lsass"
@@ -27,4 +29,10 @@ public static class CoreGuard
     public static Models.ActionResult Denied() => new(false,
         "Protected Windows Core Component",
         "Windows 核心受保护组件");
+
+    public static Models.ActionResult ElevatedExecutionDenied() => new(false,
+        ElevatedExecutionMessage, ElevatedExecutionMessageZh);
+
+    public static InvalidOperationException ElevatedExecutionException() =>
+        new($"{ElevatedExecutionMessage} / {ElevatedExecutionMessageZh}");
 }
